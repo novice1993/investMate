@@ -1,0 +1,12 @@
+# 모든 텍스트 파일에 대해 LF(Line Feed) 줄바꿈 강제
+* text=auto eol=lf
+
+# 특정 파일 형식은 바이너리로 처리
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp4 binary
+*.ico binary
+*.pdf binary
