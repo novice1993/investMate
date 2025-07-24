@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ParsedNewsItem, ParsedNewsFeed } from "../../core/types/news.type";
+import { ParsedNewsItem, ParsedNewsFeed } from "@/core/types/news.type";
 
 interface RSSResponse {
   url: string;

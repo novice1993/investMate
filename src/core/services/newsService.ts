@@ -1,5 +1,5 @@
 import Parser from "rss-parser";
-import { ParsedNewsFeed, RawRSSFeed, RawRSSItem } from "../types/news.type";
+import { ParsedNewsFeed, RawRSSFeed, RawRSSItem } from "@/core/types/news.type";
 
 /**
  * RSS XML을 파싱하는 함수
