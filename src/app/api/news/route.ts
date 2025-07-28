@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchRSSFeed } from "@/core/repositories/newsRepository";
-import { parseRSSFeed } from "@/core/services/newsService";
+import { fetchRSSFeed } from "@/core/repositories/news.repository";
+import { parseRSSFeed } from "@/core/services/news.service";
 import { apiCallWithLogging } from "@/shared/utils/api";
 
 // RSS URL에서 데이터를 가져와서 파싱하는 조합 함수
