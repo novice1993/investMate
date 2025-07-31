@@ -24,7 +24,9 @@
     ]
   },
   "dependencies": {
+    "iconv-lite": "^0.6.3",
     "next": "15.4.2",
+    "papaparse": "^5.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "rss-parser": "^3.13.0",
@@ -36,7 +38,9 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/iconv-lite": "^0.0.1",
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
