@@ -32,3 +32,6 @@ export type RequestInterceptor = (options: HttpOptions) => HttpOptions | Promise
 
 /** 응답 인터셉터 함수의 타입 */
 export type ResponseInterceptor = (response: Response) => Response | Promise<Response>;
+
+/** 최종 응답 객체를 원하는 데이터 형태로 변환하는 파서 함수의 타입 */
+export type ResponseParser = <T>(response: Response) => Promise<T>;

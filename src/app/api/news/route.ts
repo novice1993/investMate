@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchRSSFeed } from "@/core/repositories/news.repository";
 import { parseRSSFeed } from "@/core/services/news.service";
-import { apiCallWithLogging } from "@/shared/utils/api";
 
 // RSS URL에서 데이터를 가져와서 파싱하는 조합 함수
 async function fetchAndParseRSS(url: string) {
@@ -24,14 +23,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "유효하지 않은 URL입니다." }, { status: 400 });
   }
 
-  const result = await apiCallWithLogging(() => fetchAndParseRSS(url), `RSS API - ${new URL(url).hostname}`);
-
-  if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+  try {
+    const data = await fetchAndParseRSS(url);
+    return NextResponse.json({
+      url,
+      data,
+    });
+  } catch (error) {
+    console.error(`[api/news] Failed to fetch and parse RSS:`, error);
+    const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json({
-    url,
-    data: result.data,
-  });
 }
