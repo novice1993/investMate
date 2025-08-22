@@ -2,9 +2,11 @@
   "name": "invest",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
+    "build:styles": "node src/styles/scripts/build-tokens.js",
+    "dev": "npm run build:styles && next dev --turbopack",
+    "build": "npm run build:styles && next build",
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky",
