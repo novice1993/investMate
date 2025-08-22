@@ -27,9 +27,10 @@ const eslintConfig = [
         {
           groups: ["builtin", "external", "internal"],
           alphabetize: { order: "asc", caseInsensitive: true },
-          "newlines-between": "always",
+          "newlines-between": "never",
         },
       ],
+      "no-unused-vars": "warn",
     },
   },
 ];
