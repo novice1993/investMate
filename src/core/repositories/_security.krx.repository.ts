@@ -1,7 +1,6 @@
 import iconv from "iconv-lite";
 import { parse, ParseResult } from "papaparse";
 import { Security } from "@/core/entities/security.entity";
-import { apiCallWithLogging } from "@/shared/utils/api";
 
 const OTP_URL = "http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd";
 const DOWNLOAD_URL = "http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd";
@@ -92,13 +91,14 @@ export const KrxSecurityRepository = {
    * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 조회합니다.
    */
   async getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
-    const apiFunction = async () => {
+    try {
       const marketId = market === "KOSPI" ? "STK" : "KSQ";
       const otp = await generateOtp(marketId);
-      return downloadAndParseSecurities(otp, market);
-    };
-
-    const result = await apiCallWithLogging(apiFunction, "getMarketSecuritiesFromKRX");
-    return result.data || [];
+      return await downloadAndParseSecurities(otp, market);
+    } catch (error) {
+      console.error("[KrxSecurityRepository] Failed to get market securities:", error);
+      // 에러 발생 시 빈 배열을 반환하여, 전체 시스템의 장애로 이어지지 않도록 합니다.
+      return [];
+    }
   },
 };
