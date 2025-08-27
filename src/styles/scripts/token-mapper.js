@@ -47,7 +47,7 @@ export const mapTokens = () => {
     "font-family-base": tokenData.typo.font.type.value,
   };
 
-  // --- 시맨틱 토큰 (Semantic고, ㅇㅖ Tokens) ---
+  // --- 시맨틱 토큰 ---
   // TODO: 향후 이 영역에 시맨틱 토큰을 정의합니다.
   // 예: const semanticColors = { 'button-primary-bg': primitiveColors['light-primary-50'], ... };
   // 지금은 원시 토큰을 그대로 사용합니다.
@@ -61,5 +61,3 @@ export const mapTokens = () => {
     typography: semanticTypography,
   };
 };
-
-// ES Module에서는 export 구문으로 이미 내보냄

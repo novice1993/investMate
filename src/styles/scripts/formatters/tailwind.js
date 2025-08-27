@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 'C:\Users\kimyh\Desktop\investMate\tailwind.theme.js' 에 생성
+// 프로젝트 root 디렉토리에 생성
 const TARGET_PATH = join(__dirname, "../../../../tailwind.theme.js");
 
 /**
