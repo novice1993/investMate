@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const TARGET_PATH = join(__dirname, "../../../variables.css");
+const TARGET_PATH = join(__dirname, "../../variables.css");
 
 /**
  * 토큰 객체를 CSS 변수 파일 내용으로 변환합니다.
@@ -45,5 +45,3 @@ export const generateCssVariables = (tokens) => {
   writeFileSync(TARGET_PATH, cssContent, "utf8");
   console.log(`✅ CSS 변수 파일 생성 완료: ${TARGET_PATH}`);
 };
-
-// ES Module에서는 export 구문으로 이미 내보냄
