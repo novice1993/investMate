@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { Security } from "@/core/entities/security.entity";
+import { StockCard } from "./StockCard";
 
 export default function KrxTestPage() {
-  const [rawData, setRawData] = useState<string>("");
+  const [stocks, setStocks] = useState<Partial<Security>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFetchKrxData = async () => {
     setLoading(true);
     setError(null);
-    setRawData("");
+    setStocks([]);
     try {
       const response = await fetch("/api/krx/securities?market=KOSPI");
       if (!response.ok) {
@@ -18,7 +20,7 @@ export default function KrxTestPage() {
         throw new Error(errorData.error || "Failed to fetch data");
       }
       const data = await response.json();
-      setRawData(JSON.stringify(data, null, 2));
+      setStocks(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "An unknown error occurred");
     } finally {
@@ -40,10 +42,13 @@ export default function KrxTestPage() {
         </div>
       )}
 
-      {rawData && (
+      {stocks.length > 0 && (
         <div className="mt-4">
-          <h2 className="text-xl font-semibold">Raw Fetched Data</h2>
-          <pre className="bg-gray-100 p-4 rounded mt-2 overflow-auto max-h-[600px]">{rawData}</pre>
+          <div className="flex flex-col items-center gap-4">
+            {stocks.map((stock) => (
+              <StockCard key={stock.symbol} stock={stock} />
+            ))}
+          </div>
         </div>
       )}
     </div>
