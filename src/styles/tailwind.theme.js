@@ -1,3 +1,4 @@
+/* eslint-disable */
 //
 // --- 자동 생성된 파일입니다. 직접 수정하지 마세요. ---
 //
@@ -5,7 +6,7 @@
 // 토큰을 변경하려면 krds.json 또는 토큰 매퍼 스크립트를 수정하세요.
 //
 
-module.exports = {
+const tailwindTheme = {
   colors: {
     "light-primary-5": "#ecf2fe",
     "light-primary-10": "#d8e5fd",
@@ -362,3 +363,5 @@ module.exports = {
     bold: "Bold",
   },
 };
+
+export default tailwindTheme;

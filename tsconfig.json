@@ -23,7 +23,8 @@
       "@/*": ["./src/*"],
       "@/core/*": ["./src/core/*"],
       "@/shared/*": ["./src/shared/*"],
-      "@/features/*": ["./src/features/*"]
+      "@/features/*": ["./src/features/*"],
+      "@/styles/*": ["./src/styles/*"]
     },
     "types": ["vitest/globals"]
   },
