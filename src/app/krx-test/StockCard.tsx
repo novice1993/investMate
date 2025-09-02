@@ -5,8 +5,8 @@ interface Props {
 }
 
 export function StockCard({ stock }: Props) {
-  const price = stock.regularMarketPrice ?? 0;
-  const changePercent = stock.regularMarketChangePercent ?? 0;
+  const price = stock.price ?? 0;
+  const changePercent = stock.changePercent ?? 0;
   const isUp = changePercent > 0;
   const isDown = changePercent < 0;
 
@@ -30,7 +30,7 @@ export function StockCard({ stock }: Props) {
       {/* 헤더 섹션 */}
       <div className="flex items-start justify-between mb-6">
         <div className="bg-light-gray-5 rounded-xl p-4 flex-1 mr-3">
-          <h3 className="text-xl font-bold text-light-gray-90 mb-2 leading-tight">{stock.shortName}</h3>
+          <h3 className="text-xl font-bold text-light-gray-90 mb-2 leading-tight">{stock.name}</h3>
           <p className="text-sm text-light-gray-60 font-semibold">{stock.symbol}</p>
         </div>
         <div className="w-4 h-4 bg-light-success-50 rounded-full animate-pulse shadow-lg"></div>

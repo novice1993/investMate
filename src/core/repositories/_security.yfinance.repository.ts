@@ -1,11 +1,10 @@
 import yahooFinance from "yahoo-finance2";
 import { Security } from "@/core/entities/security.entity";
-import { SecurityRepository } from "./security.repository";
 
 /**
  * Yahoo Finance API를 사용하여 Security 데이터를 조회하고 변환합니다.
  */
-export const YfinanceSecurityRepository: SecurityRepository = {
+export const YfinanceSecurityRepository = {
   findBySymbol: async (symbol: string): Promise<Security | null> => {
     try {
       const quote = await yahooFinance.quote(symbol);
@@ -14,29 +13,38 @@ export const YfinanceSecurityRepository: SecurityRepository = {
         return null;
       }
 
+      const toMarket = (exchange?: string): Security["market"] => {
+        const upperExchange = exchange?.toUpperCase();
+        if (upperExchange === "NMS" || upperExchange === "NASDAQ") return "NASDAQ";
+        if (upperExchange === "NYQ" || upperExchange === "NYSE") return "NYSE";
+        if (upperExchange === "KOE") return "KOSDAQ";
+        if (upperExchange === "KSC") return "KOSPI";
+        if (upperExchange?.includes("ETF")) return "ETF";
+        return "NASDAQ"; // Default
+      };
+
+      const toCurrency = (currency?: string): Security["currency"] => {
+        if (currency === "KRW") return "KRW";
+        return "USD"; // Default
+      };
+
       // Yahoo Finance 응답 데이터를 Security 엔티티로 변환
       const security: Security = {
         symbol: quote.symbol ?? "",
-        shortName: quote.shortName || quote.longName || "",
-        longName: quote.longName,
-        currency: quote.currency ?? "",
-        regularMarketPrice: quote.regularMarketPrice ?? 0,
-        regularMarketChange: quote.regularMarketChange ?? 0,
-        regularMarketChangePercent: quote.regularMarketChangePercent ?? 0,
-        regularMarketPreviousClose: quote.regularMarketPreviousClose ?? 0,
-        regularMarketOpen: quote.regularMarketOpen ?? 0,
-        regularMarketDayHigh: quote.regularMarketDayHigh ?? 0,
-        regularMarketDayLow: quote.regularMarketDayLow ?? 0,
-        regularMarketVolume: quote.regularMarketVolume ?? 0,
-        marketCap: quote.marketCap ?? 0,
-        trailingPE: quote.trailingPE,
-        forwardPE: quote.forwardPE,
-        epsTrailingTwelveMonths: quote.epsTrailingTwelveMonths,
-        priceToBook: quote.priceToBook,
-        fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? 0,
-        fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? 0,
-        averageDailyVolume3Month: quote.averageDailyVolume3Month ?? 0,
-        regularMarketTime: new Date((Number(quote.regularMarketTime) || 0) * 1000), // Unix timestamp를 Date 객체로 변환, 유효하지 않은 값은 0으로 처리
+        name: quote.shortName || quote.longName || "",
+        price: quote.regularMarketPrice ?? 0,
+        change: quote.regularMarketChange ?? 0,
+        changePercent: quote.regularMarketChangePercent ?? 0,
+        previousClose: quote.regularMarketPreviousClose,
+        open: quote.regularMarketOpen,
+        high: quote.regularMarketDayHigh,
+        low: quote.regularMarketDayLow,
+        volume: quote.regularMarketVolume,
+        market: toMarket(quote.exchange),
+        currency: toCurrency(quote.currency),
+        country: toCurrency(quote.currency) === "KRW" ? "KR" : "US",
+        marketCap: quote.marketCap,
+        source: "yfinance",
       };
 
       return security;

@@ -72,14 +72,17 @@ async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ
   });
 
   return parsed.data.map((row) => ({
-    symbol: `${row["종목코드"]}.KS`,
-    shortName: row["종목명"],
+    symbol: row["종목코드"],
+    name: row["종목명"],
+    price: safeParseFloat(row["종가"]),
+    change: safeParseFloat(row["대비"]),
+    changePercent: safeParseFloat(row["등락률"]),
     market: market,
-    regularMarketPrice: safeParseFloat(row["종가"]),
-    regularMarketChange: safeParseFloat(row["대비"]),
-    regularMarketChangePercent: safeParseFloat(row["등락률"]),
+    currency: "KRW",
+    country: "KR",
+    source: "KRX",
+    volume: safeParseFloat(row["거래량"]),
     marketCap: safeParseFloat(row["시가총액"]),
-    regularMarketVolume: safeParseFloat(row["거래량"]),
   }));
 }
 
