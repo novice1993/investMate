@@ -1,113 +1,25 @@
-/**
- * 금융 상품(주식, ETF 등)의 핵심 정보를 나타내는 데이터 구조입니다.
- * yfinance 응답 데이터를 기반으로 애플리케이션에서 사용할 주요 필드를 정의합니다.
- */
 export interface Security {
-  /**
-   * 종목 코드 (Ticker Symbol)
-   * @example 'AAPL', '005930.KS'
-   */
-  symbol: string;
+  // 식별 정보
+  symbol: string; // 종목 코드 (005930, AAPL) - 중복되지 않는 고유 식별자
+  isin?: string; // ISIN (국제증권식별번호) - 확장성을 위해
+  name: string; // 종목명 (삼성전자, Apple Inc.)
 
-  /**
-   * 종목 약칭
-   * @example 'Apple Inc.', 'Samsung Electronics Co., Ltd.'
-   */
-  shortName: string;
+  // 시세 정보
+  price: number; // 현재가
+  change: number; // 등락액
+  changePercent: number; // 등락률
+  previousClose?: number; // 전일 종가
+  open?: number; // 시가
+  high?: number; // 고가
+  low?: number; // 저가
+  volume?: number; // 거래량
 
-  /**
-   * 종목 전체 이름
-   */
-  longName?: string;
+  // 시장 정보
+  market: "KOSPI" | "KOSDAQ" | "NASDAQ" | "NYSE" | "ETF"; // 시장 구분
+  currency: "KRW" | "USD"; // 통화
+  country: "KR" | "US"; // 국가
 
-  /**
-   * 통화 단위
-   * @example 'USD', 'KRW'
-   */
-  currency: string;
-
-  /**
-   * 정규 시장의 현재 또는 종가
-   */
-  regularMarketPrice: number;
-
-  /**
-   * 정규 시장의 가격 변동액
-   */
-  regularMarketChange: number;
-
-  /**
-   * 정규 시장의 가격 변동률 (%)
-   */
-  regularMarketChangePercent: number;
-
-  /**
-   * 정규 시장의 전일 종가
-   */
-  regularMarketPreviousClose: number;
-
-  /**
-   * 정규 시장의 시가
-   */
-  regularMarketOpen: number;
-
-  /**
-   * 정규 시장의 당일 고가
-   */
-  regularMarketDayHigh: number;
-
-  /**
-   * 정규 시장의 당일 저가
-   */
-  regularMarketDayLow: number;
-
-  /**
-   * 정규 시장의 당일 거래량
-   */
-  regularMarketVolume: number;
-
-  /**
-   * 시가총액
-   */
-  marketCap: number;
-
-  /**
-   * 후행 주가수익비율 (Trailing P/E)
-   */
-  trailingPE?: number;
-
-  /**
-   * 선행 주가수익비율 (Forward P/E)
-   */
-  forwardPE?: number;
-
-  /**
-   * 주당순이익 (지난 12개월)
-   */
-  epsTrailingTwelveMonths?: number;
-
-  /**
-   * 주가순자산비율 (PBR)
-   */
-  priceToBook?: number;
-
-  /**
-   * 52주 최고가
-   */
-  fiftyTwoWeekHigh: number;
-
-  /**
-   * 52주 최저가
-   */
-  fiftyTwoWeekLow: number;
-
-  /**
-   * 3개월 평균 일일 거래량
-   */
-  averageDailyVolume3Month: number;
-
-  /**
-   * 마지막 거래 시점의 타임스탬프
-   */
-  regularMarketTime: Date;
+  // 추가 정보
+  marketCap?: number; // 시가총액
+  source: "KRX" | "KIS" | "yfinance"; // 데이터 출처
 }
