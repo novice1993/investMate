@@ -2,9 +2,11 @@ import { Security } from "@/core/entities/security.entity";
 
 interface Props {
   stock: Partial<Security>;
+  onClick?: () => void;
+  className?: string;
 }
 
-export function StockCard({ stock }: Props) {
+export function StockCard({ stock, onClick, className = "" }: Props) {
   const price = stock.price ?? 0;
   const changePercent = stock.changePercent ?? 0;
   const isUp = changePercent > 0;
@@ -23,7 +25,10 @@ export function StockCard({ stock }: Props) {
   const changeSymbol = isUp ? "▲" : isDown ? "▼" : "-";
 
   return (
-    <div className="w-80 bg-light-gray-0 rounded-2xl shadow-lg border border-light-gray-20 p-6 m-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
+    <div
+      className={`w-80 bg-light-gray-0 rounded-2xl shadow-lg border border-light-gray-20 p-6 m-4 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden ${onClick ? "cursor-pointer" : ""} ${className}`}
+      onClick={onClick}
+    >
       {/* 상단 컬러 스트라이프 */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-light-primary-50 to-light-success-50"></div>
 
