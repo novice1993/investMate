@@ -1,17 +1,32 @@
 import Parser from "rss-parser";
-import { ParsedNewsFeed, RawRSSFeed, RawRSSItem } from "@/core/types/news.type";
+import { News } from "@/core/entities/news.entity";
+import { RawRSSFeed, RawRSSItem } from "@/core/types/news.type";
 
 /**
- * RSS XML을 파싱하는 함수
+ * RSS XML을 News Entity 배열로 변환하는 함수
  */
-export async function parseRSSFeed(xmlData: string): Promise<ParsedNewsFeed> {
+export async function parseRSSFeed(xmlData: string, source: string): Promise<News[]> {
   try {
-    const feed = await parseXML(xmlData);
-    console.log(feed);
-    return normalizeRSSFeed(feed);
+    const rawFeed = await parseXML(xmlData);
+    return rawFeed.items.map((item) => transformRawItemToNews(item, source));
   } catch (error) {
     throw new Error(`RSS 파싱에 실패했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
   }
+}
+
+/**
+ * RawRSSItem을 News Entity로 직접 변환하는 함수
+ */
+function transformRawItemToNews(item: RawRSSItem, source: string): News {
+  return {
+    id: generateRawNewsId(item),
+    title: item.title || "",
+    summary: cleanDescription(item.contentSnippet || item.content || ""),
+    url: item.link || "",
+    publishedAt: parseDate(item.pubDate || item.isoDate || ""),
+    source: source,
+    author: item.creator || item.author,
+  };
 }
 
 // XML 파싱 함수
@@ -20,27 +35,25 @@ async function parseXML(xmlData: string): Promise<RawRSSFeed> {
   return (await parser.parseString(xmlData)) as RawRSSFeed;
 }
 
-// RSS 피드 정규화 함수
-function normalizeRSSFeed(feed: RawRSSFeed): ParsedNewsFeed {
-  return {
-    title: feed.title || "",
-    description: feed.description || "",
-    link: feed.link || "",
-    items: feed.items.map(transformRSSItem),
-    lastBuildDate: feed.lastBuildDate,
-    language: feed.language,
-  };
+// News Entity 변환 헬퍼 함수들
+function generateRawNewsId(item: RawRSSItem): string {
+  // URL 기반 해시 또는 제목+날짜 조합으로 고유 ID 생성
+  const linkAndDate = (item.link || "") + (item.pubDate || item.isoDate || "");
+  return btoa(linkAndDate)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .substring(0, 16);
 }
 
-// RSS 아이템 변환 함수
-function transformRSSItem(item: RawRSSItem) {
-  return {
-    title: item.title || "",
-    link: item.link || "",
-    description: item.contentSnippet || item.content || "",
-    pubDate: item.pubDate || item.isoDate || "",
-    category: item.categories?.[0] || undefined,
-    author: item.creator || item.author || undefined,
-    content: item.content || undefined,
-  };
+function cleanDescription(description: string): string {
+  // HTML 태그 제거 및 텍스트 정리
+  return description
+    .replace(/<[^>]*>/g, "")
+    .trim()
+    .substring(0, 200);
+}
+
+function parseDate(dateString: string): Date {
+  // 다양한 날짜 형식을 Date 객체로 변환
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? new Date() : date;
 }
