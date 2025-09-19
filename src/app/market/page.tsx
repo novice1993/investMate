@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { News } from "@/core/entities/news.entity";
 import { Security } from "@/core/entities/security.entity";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
+import { NewsCard } from "../components/NewsCard";
 import { StockCard } from "../components/StockCard";
 import { StockDetailView } from "../components/StockDetailView";
 
@@ -22,6 +24,11 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<Partial<Security> | null>(null);
+
+  // 뉴스 관련 상태
+  const [news, setNews] = useState<News[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
 
   // 필터링 및 정렬을 위한 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,6 +92,73 @@ export default function MarketPage() {
     }
   };
 
+  // RSS 뉴스 데이터 불러오기
+  const fetchNewsData = async () => {
+    setNewsLoading(true);
+    setNewsError(null);
+    try {
+      console.log("📰 RSS Feed 데이터 가져오기 시작...");
+
+      const response = await fetch("/api/news?sources=mk-stock,hankyung-economy,hankyung-finance");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const newsData = await response.json();
+      console.log("📰 뉴스 데이터 수신 성공:", newsData);
+      console.log("📰 뉴스 개수:", newsData.data?.length || 0);
+
+      if (newsData.data && Array.isArray(newsData.data)) {
+        setNews(newsData.data);
+        console.log("📰 첫 5개 뉴스:", newsData.data.slice(0, 5));
+      } else {
+        console.warn("📰 뉴스 데이터 형식이 예상과 다릅니다:", newsData);
+        setNews([]);
+      }
+    } catch (err) {
+      console.error("📰 RSS Feed 오류:", err);
+      setNewsError(err instanceof Error ? err.message : "뉴스를 불러오는데 실패했습니다");
+    } finally {
+      setNewsLoading(false);
+    }
+  };
+
+  // RSS 뉴스 API 테스트 (콘솔 로그용)
+  const testRSSFeedAPI = async () => {
+    try {
+      console.log("📰 RSS Feed API 테스트 시작...");
+
+      // 개별 소스 테스트 - 매일경제 증권
+      console.log("📰 매일경제 증권 단독 테스트...");
+      const mkResponse = await fetch("/api/news?source=mk-stock");
+      if (mkResponse.ok) {
+        const mkData = await mkResponse.json();
+        console.log("📰 매일경제 증권 뉴스:", mkData);
+        console.log("📰 매일경제 증권 뉴스 개수:", mkData.data?.length || 0);
+      }
+
+      // 개별 소스 테스트 - 한국경제 경제
+      console.log("📰 한국경제 경제 단독 테스트...");
+      const hankyungEconomyResponse = await fetch("/api/news?source=hankyung-economy");
+      if (hankyungEconomyResponse.ok) {
+        const hankyungEconomyData = await hankyungEconomyResponse.json();
+        console.log("📰 한국경제 경제 뉴스:", hankyungEconomyData);
+        console.log("📰 한국경제 경제 뉴스 개수:", hankyungEconomyData.data?.length || 0);
+      }
+
+      // 개별 소스 테스트 - 한국경제 증권
+      console.log("📰 한국경제 증권 단독 테스트...");
+      const hankyungFinanceResponse = await fetch("/api/news?source=hankyung-finance");
+      if (hankyungFinanceResponse.ok) {
+        const hankyungFinanceData = await hankyungFinanceResponse.json();
+        console.log("📰 한국경제 증권 뉴스:", hankyungFinanceData);
+        console.log("📰 한국경제 증권 뉴스 개수:", hankyungFinanceData.data?.length || 0);
+      }
+    } catch (err) {
+      console.error("📰 RSS Feed API 오류:", err);
+    }
+  };
+
   // 필터링 및 정렬 로직
   const processedStocks = useMemo(() => {
     let processableStocks = [...stocks];
@@ -136,6 +210,11 @@ export default function MarketPage() {
     setSelectedStock(stock);
   };
 
+  // 페이지 로드시 뉴스 데이터 불러오기
+  React.useEffect(() => {
+    fetchNewsData();
+  }, []);
+
   return (
     <div className="container mx-auto p-6 min-h-full">
       <div className="mb-6">
@@ -154,7 +233,15 @@ export default function MarketPage() {
           {/* 컨트롤 영역 */}
           <div className="flex flex-wrap gap-2 mb-4">
             <button onClick={handleFetchKrxData} disabled={loading} className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
-              {loading ? "로딩 중..." : "데이터 불러오기"}
+              {loading ? "로딩 중..." : "종목 데이터 불러오기"}
+            </button>
+
+            <button onClick={fetchNewsData} disabled={newsLoading} className="bg-green-500 hover:bg-green-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
+              {newsLoading ? "뉴스 로딩중..." : "뉴스 불러오기"}
+            </button>
+
+            <button onClick={testRSSFeedAPI} className="bg-yellow-500 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded text-sm">
+              API 테스트 (콘솔)
             </button>
 
             <input
@@ -192,7 +279,7 @@ export default function MarketPage() {
                 containerHeight={containerHeight}
                 renderItem={(stock) => (
                   <div className="flex justify-center items-center h-full">
-                    <StockCard stock={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
+                    <StockCard security={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
                   </div>
                 )}
               />
@@ -207,8 +294,55 @@ export default function MarketPage() {
         </div>
 
         {/* Detail: 상세 정보 */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <StockDetailView stock={selectedStock} />
+        <div className="flex flex-col gap-6">
+          {/* 선택된 종목 정보 */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {selectedStock ? (
+              <StockDetailView security={selectedStock} />
+            ) : (
+              <div className="flex items-center justify-center h-48 text-gray-500">
+                <div className="text-center">
+                  <div className="text-4xl mb-4">📊</div>
+                  <p className="text-lg font-medium">종목을 선택해주세요</p>
+                  <p className="text-sm">상세 정보를 확인할 수 있습니다</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 뉴스 섹션 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">실시간 뉴스</h3>
+              <span className="text-sm text-gray-500">매일경제 증권 · 한국경제 경제/증권</span>
+            </div>
+
+            {newsError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded text-sm">
+                <p className="font-semibold">뉴스 로딩 오류:</p>
+                <p>{newsError}</p>
+              </div>
+            )}
+
+            {newsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">뉴스를 불러오는 중...</div>
+              </div>
+            ) : news.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {news.map((newsItem) => (
+                  <NewsCard key={newsItem.id} news={newsItem} onClick={() => window.open(newsItem.url, "_blank")} />
+                ))}
+                <div className="text-center py-2 text-xs text-gray-400">총 {news.length}개의 뉴스</div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📰</div>
+                <p>뉴스 데이터가 없습니다</p>
+                <p className="text-sm mt-1">뉴스 불러오기 버튼을 클릭해보세요</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
