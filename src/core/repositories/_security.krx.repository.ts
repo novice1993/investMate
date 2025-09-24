@@ -1,24 +1,30 @@
 import iconv from "iconv-lite";
 import { parse, ParseResult } from "papaparse";
 import { Security } from "@/core/entities/security.entity";
+import { RawKrxRow } from "@/core/types/security.type";
 
 const OTP_URL = "http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd";
 const DOWNLOAD_URL = "http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd";
 
 /**
- * KRX에서 받은 CSV 데이터 한 행의 타입을 정의합니다.
+ * KRX 데이터 시스템에서 종목 목록을 가져오는 리포지토리 구현체
  */
-interface KrxCsvRow {
-  종목코드: string;
-  종목명: string;
-  시장구분: string;
-  종가: string;
-  대비: string;
-  등락률: string;
-  시가총액: string;
-  거래량: string;
-  [key: string]: string; // 그 외 예상치 못한 컬럼이 있을 수 있음을 명시
-}
+export const KrxSecurityRepository = {
+  /**
+   * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 조회합니다.
+   */
+  async getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
+    try {
+      const marketId = market === "KOSPI" ? "STK" : "KSQ";
+      const otp = await generateOtp(marketId);
+      return await downloadAndParseSecurities(otp, market);
+    } catch (error) {
+      console.error("[KrxSecurityRepository] Failed to get market securities:", error);
+      // 에러 발생 시 빈 배열을 반환하여, 전체 시스템의 장애로 이어지지 않도록 합니다.
+      return [];
+    }
+  },
+};
 
 /**
  * KRX 서버에 OTP 생성을 요청합니다.
@@ -46,14 +52,6 @@ async function generateOtp(marketId: string): Promise<string> {
 }
 
 /**
- * CSV의 문자열 값을 숫자로 변환하는 헬퍼 함수.
- */
-function safeParseFloat(value: string): number {
-  if (!value) return 0;
-  return parseFloat(value.replace(/,/g, "")) || 0;
-}
-
-/**
  * 발급받은 OTP를 사용하여 CSV 데이터를 다운로드하고 표준 형식으로 파싱합니다.
  */
 async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
@@ -66,7 +64,7 @@ async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ
   const buffer = await downloadResponse.arrayBuffer();
   const decodedCsv = iconv.decode(Buffer.from(buffer), "euc-kr");
 
-  const parsed: ParseResult<KrxCsvRow> = parse<KrxCsvRow>(decodedCsv, {
+  const parsed: ParseResult<RawKrxRow> = parse<RawKrxRow>(decodedCsv, {
     header: true,
     skipEmptyLines: true,
   });
@@ -87,21 +85,9 @@ async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ
 }
 
 /**
- * KRX 데이터 시스템에서 종목 목록을 가져오는 리포지토리 구현체
+ * CSV의 문자열 값을 숫자로 변환하는 헬퍼 함수.
  */
-export const KrxSecurityRepository = {
-  /**
-   * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 조회합니다.
-   */
-  async getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
-    try {
-      const marketId = market === "KOSPI" ? "STK" : "KSQ";
-      const otp = await generateOtp(marketId);
-      return await downloadAndParseSecurities(otp, market);
-    } catch (error) {
-      console.error("[KrxSecurityRepository] Failed to get market securities:", error);
-      // 에러 발생 시 빈 배열을 반환하여, 전체 시스템의 장애로 이어지지 않도록 합니다.
-      return [];
-    }
-  },
-};
+function safeParseFloat(value: string): number {
+  if (!value) return 0;
+  return parseFloat(value.replace(/,/g, "")) || 0;
+}

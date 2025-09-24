@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Security } from "@/core/entities/security.entity";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
+import { NewsCard } from "../components/NewsCard";
 import { StockCard } from "../components/StockCard";
 import { StockDetailView } from "../components/StockDetailView";
+import { useNewsData } from "./hooks/useNewsData";
+import { useStockData } from "./hooks/useStockData";
 
 // 가상화 리스트 설정
 const ITEM_HEIGHT = 330;
@@ -18,10 +21,11 @@ interface SortConfig {
 }
 
 export default function MarketPage() {
-  const [stocks, setStocks] = useState<Partial<Security>[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<Partial<Security> | null>(null);
+
+  // Custom hooks for data management
+  const { stocks, loading, error, fetchStockData } = useStockData();
+  const { news, loading: newsLoading, error: newsError, fetchNewsData } = useNewsData();
 
   // 필터링 및 정렬을 위한 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,25 +69,6 @@ export default function MarketPage() {
       window.removeEventListener("scroll", calculateHeight);
     };
   }, [stocks]);
-
-  const handleFetchKrxData = async () => {
-    setLoading(true);
-    setError(null);
-    setStocks([]);
-    try {
-      const response = await fetch("/api/krx/securities?market=KOSPI");
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch data");
-      }
-      const data = await response.json();
-      setStocks(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "An unknown error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // 필터링 및 정렬 로직
   const processedStocks = useMemo(() => {
@@ -153,8 +138,8 @@ export default function MarketPage() {
 
           {/* 컨트롤 영역 */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={handleFetchKrxData} disabled={loading} className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
-              {loading ? "로딩 중..." : "데이터 불러오기"}
+            <button onClick={fetchStockData} disabled={loading} className="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
+              {loading ? "로딩 중..." : "종목 데이터 불러오기"}
             </button>
 
             <input
@@ -192,7 +177,7 @@ export default function MarketPage() {
                 containerHeight={containerHeight}
                 renderItem={(stock) => (
                   <div className="flex justify-center items-center h-full">
-                    <StockCard stock={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
+                    <StockCard security={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
                   </div>
                 )}
               />
@@ -207,8 +192,60 @@ export default function MarketPage() {
         </div>
 
         {/* Detail: 상세 정보 */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <StockDetailView stock={selectedStock} />
+        <div className="flex flex-col gap-6">
+          {/* 선택된 종목 정보 */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {selectedStock ? (
+              <StockDetailView security={selectedStock} />
+            ) : (
+              <div className="flex items-center justify-center h-48 text-gray-500">
+                <div className="text-center">
+                  <div className="text-4xl mb-4">📊</div>
+                  <p className="text-lg font-medium">종목을 선택해주세요</p>
+                  <p className="text-sm">상세 정보를 확인할 수 있습니다</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 뉴스 섹션 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">실시간 뉴스</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">매일경제 증권 · 한국경제 경제/증권</span>
+                <button onClick={fetchNewsData} disabled={newsLoading} className="bg-green-500 hover:bg-green-700 text-white font-medium py-1 px-3 rounded disabled:bg-gray-400 text-xs">
+                  {newsLoading ? "로딩중..." : "새로고침"}
+                </button>
+              </div>
+            </div>
+
+            {newsError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded text-sm">
+                <p className="font-semibold">뉴스 로딩 오류:</p>
+                <p>{newsError}</p>
+              </div>
+            )}
+
+            {newsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">뉴스를 불러오는 중...</div>
+              </div>
+            ) : news.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {news.map((newsItem) => (
+                  <NewsCard key={newsItem.id} news={newsItem} onClick={() => window.open(newsItem.url, "_blank")} />
+                ))}
+                <div className="text-center py-2 text-xs text-gray-400">총 {news.length}개의 뉴스</div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📰</div>
+                <p>뉴스 데이터가 없습니다</p>
+                <p className="text-sm mt-1">뉴스 불러오기 버튼을 클릭해보세요</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
