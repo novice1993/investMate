@@ -1,5 +1,5 @@
 import { Security } from "@/core/entities/security.entity";
-import { securityRepository, SecurityRepository } from "@/core/repositories/security.repository";
+import { securityRepository, SecurityRepository } from "@/core/infrastructure/security.infra";
 
 /**
  * 금융 상품 관련 비즈니스 로직을 처리하는 서비스 인터페이스입니다.
