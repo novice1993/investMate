@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { News } from "@/core/entities/news.entity";
-import { fetchRSSFeed } from "@/core/repositories/news.repository";
+import { fetchRSSFeed } from "@/core/infrastructure/news.infra";
 import { parseRSSFeed } from "@/core/services/news.service";
 import { getActiveRSSSources, RSSSource } from "./config/sources";
 

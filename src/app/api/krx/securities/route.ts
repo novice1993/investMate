@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { securityRepository } from "@/core/repositories/security.repository";
+import { securityRepository } from "@/core/infrastructure/security.infra";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
