@@ -1,6 +1,6 @@
 import { Security } from "@/core/entities/security.entity";
-import { KrxSecurityRepository } from "./_security.krx.repository";
-import { YfinanceSecurityRepository } from "./_security.yfinance.repository";
+import { KrxSecurityRepository } from "./_security.krx.infra";
+import { YfinanceSecurityRepository } from "./_security.yfinance.infra";
 
 /**
  * 금융 상품 데이터에 접근하기 위한 리포지토리 인터페이스입니다.
