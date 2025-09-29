@@ -13,9 +13,6 @@ export async function GET() {
     // 2. XML을 파싱하고, 지정된 섹션으로 필터링하여 News[] 엔티티 배열로 변환
     const news = parseMKSitemap(xmlData, ALLOWED_SECTIONS);
 
-    // 3. 콘솔에 최종 변환된 News 엔티티 배열 로그 출력
-    console.log("[/api/news] Transformed News Entities:", JSON.stringify(news, null, 2));
-
     // 4. 변환된 결과를 클라이언트에 반환
     return NextResponse.json({ data: news });
   } catch (error) {

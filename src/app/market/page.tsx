@@ -128,7 +128,6 @@ export default function MarketPage() {
   };
 
   const handleNewsClick = async (url: string) => {
-    console.log(`Scraping URL: ${url}`);
     try {
       const result = await jsonHttpClient.get<ScrapeApiResponse>(`/api/scrape?url=${encodeURIComponent(url)}`);
       console.log("Scraping API response:", result);
