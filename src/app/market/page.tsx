@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Security } from "@/core/entities/security.entity";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
+import { jsonHttpClient } from "@/shared/lib/http";
 import { NewsCard } from "../components/NewsCard";
 import { StockCard } from "../components/StockCard";
 import { StockDetailView } from "../components/StockDetailView";
@@ -18,6 +19,11 @@ type SortDirection = "asc" | "desc";
 interface SortConfig {
   key: SortKey;
   direction: SortDirection;
+}
+
+interface ScrapeApiResponse {
+  message: string;
+  url: string;
 }
 
 export default function MarketPage() {
@@ -119,6 +125,17 @@ export default function MarketPage() {
 
   const handleStockClick = (stock: Partial<Security>) => {
     setSelectedStock(stock);
+  };
+
+  const handleNewsClick = async (url: string) => {
+    console.log(`Scraping URL: ${url}`);
+    try {
+      const result = await jsonHttpClient.get<ScrapeApiResponse>(`/api/scrape?url=${encodeURIComponent(url)}`);
+      console.log("Scraping API response:", result);
+    } catch (error) {
+      console.error("Failed to scrape URL:", error);
+      alert(`스크래핑 요청에 실패했습니다: ${error}`);
+    }
   };
 
   return (
@@ -234,7 +251,7 @@ export default function MarketPage() {
             ) : news.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {news.map((newsItem) => (
-                  <NewsCard key={newsItem.id} news={newsItem} onClick={() => window.open(newsItem.url, "_blank")} />
+                  <NewsCard key={newsItem.id} news={newsItem} onClick={() => handleNewsClick(newsItem.url)} />
                 ))}
                 <div className="text-center py-2 text-xs text-gray-400">총 {news.length}개의 뉴스</div>
               </div>
