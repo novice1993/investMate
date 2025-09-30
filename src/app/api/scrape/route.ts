@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { summarizeArticle } from "@/core/services/llm.service";
 import { scrapeArticle } from "@/core/services/scrape.service";
 
 export async function GET(request: NextRequest) {
@@ -11,12 +12,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const scrapedData = await scrapeArticle(urlToScrape);
-    console.log(scrapedData);
 
-    // return NextResponse.json(scrapedData);
+    // Call the summarization service
+    const summary = await summarizeArticle(scrapedData);
+
+    // Return both the scraped data and the summary
+    return NextResponse.json({ summary });
   } catch (error) {
     console.error(`[API /api/scrape] Failed to scrape URL: ${urlToScrape}`, error);
-    const message = error instanceof Error ? error.message : "Failed to scrape content.";
+    const message = error instanceof Error ? error.message : "Failed to scrape content or summarize.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
