@@ -1,59 +1,65 @@
-import Parser from "rss-parser";
+import { XMLParser } from "fast-xml-parser";
 import { News } from "@/core/entities/news.entity";
-import { RawRSSFeed, RawRSSItem } from "@/core/types/news.type";
+import { MkSitemap, MkSitemapUrl } from "@/core/types/news.type";
 
 /**
- * RSS XML을 News Entity 배열로 변환하는 함수
+ * 매경 사이트맵 XML을 News Entity 배열로 변환하는 함수
  */
-export async function parseRSSFeed(xmlData: string, source: string): Promise<News[]> {
-  try {
-    const rawFeed = await parseXML(xmlData);
-    return rawFeed.items.map((item) => transformRawItemToNews(item, source));
-  } catch (error) {
-    throw new Error(`RSS 파싱에 실패했습니다: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
+export function parseMKSitemap(xmlData: string, allowedSections: string[]): News[] {
+  const parser = new XMLParser();
+  const jsonObj: MkSitemap = parser.parse(xmlData);
+
+  if (!jsonObj.urlset || !Array.isArray(jsonObj.urlset.url)) {
+    return [];
   }
+
+  const allUrls: MkSitemapUrl[] = jsonObj.urlset.url;
+  const filteredUrls = filterMkSitemapUrlsBySection(allUrls, allowedSections);
+
+  return filteredUrls.map(transformSitemapUrlToNews);
 }
 
 /**
- * RawRSSItem을 News Entity로 직접 변환하는 함수
+ * URL에서 섹션을 추출하여 허용된 섹션의 기사만 필터링하는 함수
  */
-function transformRawItemToNews(item: RawRSSItem, source: string): News {
+function filterMkSitemapUrlsBySection(urls: MkSitemapUrl[], allowedSections: string[]): MkSitemapUrl[] {
+  return urls.filter((url) => {
+    try {
+      const urlPath = new URL(url.loc).pathname; // ex: /news/stock/11430262
+      const pathSegments = urlPath.split("/").filter(Boolean); // ex: ["news", "stock", "11430262"]
+
+      if (pathSegments.length > 1 && pathSegments[0] === "news") {
+        const section = pathSegments[1];
+        return allowedSections.includes(section);
+      }
+      return false;
+    } catch (error) {
+      console.error(`Invalid URL found: ${url.loc}`, error);
+      return false;
+    }
+  });
+}
+
+/**
+ * MkSitemapUrl을 News Entity로 변환하는 함수
+ */
+function transformSitemapUrlToNews(sitemapUrl: MkSitemapUrl): News {
+  const newsItem = sitemapUrl["news:news"];
+
   return {
-    id: generateRawNewsId(item),
-    title: item.title || "",
-    summary: cleanDescription(item.contentSnippet || item.content || ""),
-    url: item.link || "",
-    publishedAt: parseDate(item.pubDate || item.isoDate || ""),
-    source: source,
-    author: item.creator || item.author,
+    id: generateNewsId(sitemapUrl.loc),
+    title: newsItem["news:title"],
+    summary: "", // 사이트맵에는 요약 정보가 없으므로 빈 문자열로 처리
+    url: sitemapUrl.loc,
+    publishedAt: new Date(newsItem["news:publication_date"]),
+    source: newsItem["news:publication"]["news:name"],
+    // author 정보는 사이트맵에 없으므로 비워둠
   };
 }
 
-// XML 파싱 함수
-async function parseXML(xmlData: string): Promise<RawRSSFeed> {
-  const parser = new Parser();
-  return (await parser.parseString(xmlData)) as RawRSSFeed;
-}
-
-// News Entity 변환 헬퍼 함수들
-function generateRawNewsId(item: RawRSSItem): string {
-  // URL 기반 해시 또는 제목+날짜 조합으로 고유 ID 생성
-  const linkAndDate = (item.link || "") + (item.pubDate || item.isoDate || "");
-  return btoa(linkAndDate)
+function generateNewsId(url: string): string {
+  // URL을 기반으로 고유 ID 생성
+  return btoa(url)
     .replace(/[^a-zA-Z0-9]/g, "")
     .substring(0, 16);
-}
-
-function cleanDescription(description: string): string {
-  // HTML 태그 제거 및 텍스트 정리
-  return description
-    .replace(/<[^>]*>/g, "")
-    .trim()
-    .substring(0, 200);
-}
-
-function parseDate(dateString: string): Date {
-  // 다양한 날짜 형식을 Date 객체로 변환
-  const date = new Date(dateString);
-  return isNaN(date.getTime()) ? new Date() : date;
 }
