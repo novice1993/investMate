@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #171717;
+}
+
+body {
+  color: var(--foreground);
+  font-family: var(--typo-font-family-base, "Pretendard GOV", Arial, Helvetica, sans-serif);
+}
+
+/* 추가 전역 스타일 */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+}
+
+html,
+body {
+  height: 100%;
+}

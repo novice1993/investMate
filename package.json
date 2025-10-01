@@ -2,12 +2,16 @@
   "name": "invest",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
+    "build:styles": "node src/styles/scripts/build-tokens.js",
+    "dev": "npm run build:styles && next dev --turbopack",
+    "build": "npm run build:styles && next build",
     "start": "next start",
     "lint": "next lint",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -22,24 +26,38 @@
     ]
   },
   "dependencies": {
+    "@google/genai": "^1.21.0",
+    "cheerio": "^1.1.2",
+    "fast-xml-parser": "^5.2.5",
+    "iconv-lite": "^0.6.3",
     "next": "15.4.2",
+    "papaparse": "^5.5.3",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "rss-parser": "^3.13.0",
+    "yahoo-finance2": "^2.13.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/cheerio": "^0.22.35",
+    "@types/iconv-lite": "^0.0.1",
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.4.2",
-    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.3",
     "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }
