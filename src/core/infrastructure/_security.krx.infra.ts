@@ -1,5 +1,5 @@
 import iconv from "iconv-lite";
-import { parse, ParseResult } from "papaparse";
+import Papa from "papaparse";
 import { Security } from "@/core/entities/security.entity";
 import { RawKrxRow } from "@/core/types/security.type";
 
@@ -64,7 +64,7 @@ async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ
   const buffer = await downloadResponse.arrayBuffer();
   const decodedCsv = iconv.decode(Buffer.from(buffer), "euc-kr");
 
-  const parsed: ParseResult<RawKrxRow> = parse<RawKrxRow>(decodedCsv, {
+  const parsed: Papa.ParseResult<RawKrxRow> = Papa.parse<RawKrxRow>(decodedCsv, {
     header: true,
     skipEmptyLines: true,
   });
