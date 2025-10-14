@@ -6,7 +6,7 @@ export async function register() {
     console.log("Starting application initialization in Node.js runtime...");
 
     try {
-      await initializeKisToken();
+      // await initializeKisToken();
       await initializeGemini();
       console.log("Application initialization finished successfully.");
     } catch (error) {
@@ -15,16 +15,16 @@ export async function register() {
     }
 
     // Register graceful shutdown hooks
-    process.on("SIGTERM", async () => {
-      console.log("Received SIGTERM signal. Cleaning up...");
-      await cleanupApplication();
-      process.exit(0);
-    });
+    // process.on("SIGTERM", async () => {
+    //   console.log("Received SIGTERM signal. Cleaning up...");
+    //   await cleanupApplication();
+    //   process.exit(0);
+    // });
 
-    process.on("SIGINT", async () => {
-      console.log("Received SIGINT signal. Cleaning up...");
-      await cleanupApplication();
-      process.exit(0);
-    });
+    // process.on("SIGINT", async () => {
+    //   console.log("Received SIGINT signal. Cleaning up...");
+    //   await cleanupApplication();
+    //   process.exit(0);
+    // });
   }
 }
