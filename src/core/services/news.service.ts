@@ -1,26 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
-import { News } from "@/core/entities/news.entity";
+import { News, NewsArticle } from "@/core/entities/news.entity";
 import { getSupabaseClient } from "@/core/infrastructure/supabase.infra";
 import { MkSitemap, MkSitemapUrl } from "@/core/types/news.type";
 
 /**
  * @fileoverview 뉴스 관련 비즈니스 로직과 데이터베이스 작업을 담당하는 서비스 레이어
  */
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export interface NewsArticle {
-  id?: string;
-  title: string;
-  url: string;
-  summary: string;
-  section: string;
-  source: string;
-  published_at: string; // ISO 8601 format
-  created_at?: string;
-}
 
 // ============================================================================
 // Database Operations
@@ -181,4 +166,31 @@ function generateNewsId(url: string): string {
   return btoa(url)
     .replace(/[^a-zA-Z0-9]/g, "")
     .substring(0, 16);
+}
+
+// ============================================================================
+// URL Utilities
+// ============================================================================
+
+/**
+ * URL에서 섹션 정보를 추출합니다.
+ * @param url 뉴스 기사 URL
+ * @returns 섹션 이름 (예: "stock", "economy") 또는 "unknown"
+ * @example
+ * extractSectionFromUrl("https://www.mk.co.kr/news/stock/11430262") // "stock"
+ */
+export function extractSectionFromUrl(url: string): string {
+  try {
+    const urlPath = new URL(url).pathname;
+    const pathSegments = urlPath.split("/").filter(Boolean);
+
+    if (pathSegments.length > 1 && pathSegments[0] === "news") {
+      return pathSegments[1];
+    }
+
+    return "unknown";
+  } catch (error) {
+    console.error(`[News Service] URL 파싱 실패: ${url}`, error);
+    return "unknown";
+  }
 }
