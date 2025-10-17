@@ -1,5 +1,6 @@
 import { issueKisToken, revokeKisToken } from "@/core/infrastructure/kis.auth.infra";
 import { initializeGeminiClient } from "@/core/infrastructure/llm.infra";
+import { initializeSupabaseClient } from "@/core/infrastructure/supabase.infra";
 import { getAuthToken, setAuthToken, clearAuthToken } from "@/core/services/kis.auth.service";
 
 /**
@@ -27,6 +28,18 @@ export async function initializeGemini() {
     initializeGeminiClient();
   } catch (error) {
     console.error("Error during Gemini initialization:", error);
+    throw error;
+  }
+}
+
+/**
+ * Supabase 클라이언트를 생성하는 초기화 함수
+ */
+export async function initializeSupabase() {
+  try {
+    initializeSupabaseClient();
+  } catch (error) {
+    console.error("Error during Supabase initialization:", error);
     throw error;
   }
 }
