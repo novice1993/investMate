@@ -93,10 +93,10 @@ async function fetchAndParseSitemap(): Promise<NewsItem[]> {
   console.log(`[Workflow] ${newsList.length}개 기사 발견`);
 
   // TODO: 테스트용 - 필요시 주석 해제하여 사용
-  const newsListToProcess = newsList.slice(0, 5);
-  console.log(`[Workflow] [테스트] ${newsListToProcess.length}개만 처리합니다.`);
-  return newsListToProcess;
-  // return newsList;
+  // const newsListToProcess = newsList.slice(0, 5);
+  // console.log(`[Workflow] [테스트] ${newsListToProcess.length}개만 처리합니다.`);
+  // return newsListToProcess;
+  return newsList;
 }
 
 /**
