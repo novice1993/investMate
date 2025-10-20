@@ -1,0 +1,42 @@
+name: News Collection Scheduler
+
+on:
+  # 매시간 정각에 실행 (UTC 기준)
+  schedule:
+    - cron: "0 * * * *"
+
+  # 수동 실행 가능 (테스트용)
+  workflow_dispatch:
+
+jobs:
+  collect-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger news collection workflow
+        run: |
+          echo "Starting news collection at $(date)"
+
+          # Render 배포된 API 엔드포인트 호출
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            https://investmate-nznh.onrender.com/api/workflows/news-collect)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          echo "HTTP Status: $http_code"
+          echo "Response Body: $body"
+
+          # 200번대 응답이 아니면 실패 처리
+          if [[ $http_code -lt 200 || $http_code -ge 300 ]]; then
+            echo "Error: News collection failed with status $http_code"
+            exit 1
+          fi
+
+          echo "News collection completed successfully!"
+
+      - name: Send notification on failure
+        if: failure()
+        run: |
+          echo "⚠️ News collection workflow failed!"
+          echo "Please check the logs and Render deployment status."
