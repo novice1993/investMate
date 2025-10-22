@@ -1,14 +1,15 @@
 "use client";
 
-import { News } from "@/core/entities/news.entity";
+import { NewsArticle } from "@/core/entities/news.entity";
 
 interface NewsCardProps {
-  news: News;
+  news: NewsArticle;
   onClick?: () => void;
 }
 
 export function NewsCard({ news, onClick }: NewsCardProps) {
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -31,7 +32,7 @@ export function NewsCard({ news, onClick }: NewsCardProps) {
       {/* 헤더: 소스 + 날짜 */}
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">{news.source}</span>
-        <span className="text-xs text-gray-500">{formatDate(new Date(news.publishedAt))}</span>
+        <span className="text-xs text-gray-500">{formatDate(news.published_at)}</span>
       </div>
 
       {/* 제목 */}
@@ -39,9 +40,6 @@ export function NewsCard({ news, onClick }: NewsCardProps) {
 
       {/* 요약 */}
       <p className="text-sm text-gray-600 line-clamp-3 mb-3">{news.summary}</p>
-
-      {/* 기자명 (있는 경우) */}
-      {news.author && <div className="text-xs text-gray-400">{news.author}</div>}
     </div>
   );
 }

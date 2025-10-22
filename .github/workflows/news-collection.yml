@@ -1,9 +1,9 @@
 name: News Collection Scheduler
 
 on:
-  # 매시간 정각에 실행 (UTC 기준)
+  # 10분마다 실행 (UTC 기준)
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/10 * * * *"
 
   # 수동 실행 가능 (테스트용)
   workflow_dispatch:
