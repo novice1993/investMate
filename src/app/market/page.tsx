@@ -3,7 +3,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Security } from "@/core/entities/security.entity";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
-import { jsonHttpClient } from "@/shared/lib/http";
 import { NewsCard } from "../components/NewsCard";
 import { StockCard } from "../components/StockCard";
 import { StockDetailView } from "../components/StockDetailView";
@@ -19,11 +18,6 @@ type SortDirection = "asc" | "desc";
 interface SortConfig {
   key: SortKey;
   direction: SortDirection;
-}
-
-interface ScrapeApiResponse {
-  message: string;
-  url: string;
 }
 
 export default function MarketPage() {
@@ -127,14 +121,8 @@ export default function MarketPage() {
     setSelectedStock(stock);
   };
 
-  const handleNewsClick = async (url: string) => {
-    try {
-      const result = await jsonHttpClient.get<ScrapeApiResponse>(`/api/scrape?url=${encodeURIComponent(url)}`);
-      console.log("Scraping API response:", result);
-    } catch (error) {
-      console.error("Failed to scrape URL:", error);
-      alert(`스크래핑 요청에 실패했습니다: ${error}`);
-    }
+  const handleNewsClick = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (

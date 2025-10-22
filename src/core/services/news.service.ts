@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import { News, NewsArticle } from "@/core/entities/news.entity";
+import { NewsArticle } from "@/core/entities/news.entity";
 import { getSupabaseClient } from "@/core/infrastructure/supabase.infra";
 import { MkSitemap, MkSitemapUrl } from "@/core/types/news.type";
 
@@ -107,9 +107,9 @@ export async function fetchLatestNewsArticle() {
 // ============================================================================
 
 /**
- * 매경 사이트맵 XML을 News Entity 배열로 변환하는 함수
+ * 매경 사이트맵 XML을 NewsArticle 배열로 변환하는 함수
  */
-export function parseMKSitemap(xmlData: string, allowedSections: string[]): News[] {
+export function parseMKSitemap(xmlData: string, allowedSections: string[]): NewsArticle[] {
   const parser = new XMLParser();
   const jsonObj: MkSitemap = parser.parse(xmlData);
 
@@ -120,7 +120,7 @@ export function parseMKSitemap(xmlData: string, allowedSections: string[]): News
   const allUrls: MkSitemapUrl[] = jsonObj.urlset.url;
   const filteredUrls = filterMkSitemapUrlsBySection(allUrls, allowedSections);
 
-  return filteredUrls.map(transformSitemapUrlToNews);
+  return filteredUrls.map(transformSitemapUrlToNewsArticle);
 }
 
 /**
@@ -145,27 +145,19 @@ function filterMkSitemapUrlsBySection(urls: MkSitemapUrl[], allowedSections: str
 }
 
 /**
- * MkSitemapUrl을 News Entity로 변환하는 함수
+ * MkSitemapUrl을 NewsArticle로 변환하는 함수
  */
-function transformSitemapUrlToNews(sitemapUrl: MkSitemapUrl): News {
+function transformSitemapUrlToNewsArticle(sitemapUrl: MkSitemapUrl): NewsArticle {
   const newsItem = sitemapUrl["news:news"];
 
   return {
-    id: generateNewsId(sitemapUrl.loc),
     title: newsItem["news:title"],
-    summary: "", // 사이트맵에는 요약 정보가 없으므로 빈 문자열로 처리
     url: sitemapUrl.loc,
-    publishedAt: new Date(newsItem["news:publication_date"]),
+    summary: "", // AI 요약 전이므로 빈 문자열
+    section: extractSectionFromUrl(sitemapUrl.loc),
     source: newsItem["news:publication"]["news:name"],
-    // author 정보는 사이트맵에 없으므로 비워둠
+    published_at: new Date(newsItem["news:publication_date"]).toISOString(),
   };
-}
-
-function generateNewsId(url: string): string {
-  // URL을 기반으로 고유 ID 생성
-  return btoa(url)
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .substring(0, 16);
 }
 
 // ============================================================================
