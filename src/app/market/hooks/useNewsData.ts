@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { News } from "@/core/entities/news.entity";
+import { NewsArticle } from "@/core/entities/news.entity";
 
 interface UseNewsDataReturn {
-  news: News[];
+  news: NewsArticle[];
   loading: boolean;
   error: string | null;
   fetchNewsData: () => Promise<void>;
@@ -10,7 +10,7 @@ interface UseNewsDataReturn {
 }
 
 export function useNewsData(autoFetch = true): UseNewsDataReturn {
-  const [news, setNews] = useState<News[]>([]);
+  const [news, setNews] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
