@@ -22,6 +22,7 @@ ${articles
   .map(
     (article, idx) => `
 [기사 ${idx + 1}]
+URL: ${article.url}
 제목: ${article.title}
 본문: ${article.body}
 `
@@ -36,19 +37,32 @@ ${articles
 
 출력 형식 (반드시 유효한 JSON 객체로만 응답):
 {
-  "기사 제목 1": "• 요약 포인트 1\\n• 요약 포인트 2\\n• 요약 포인트 3",
-  "기사 제목 2": "• 요약 포인트 1\\n• 요약 포인트 2\\n• 요약 포인트 3"
+  "https://www.mk.co.kr/news/stock/11448969": "• 요약 포인트 1\\n• 요약 포인트 2\\n• 요약 포인트 3",
+  "https://www.mk.co.kr/news/business/11448884": "• 요약 포인트 1\\n• 요약 포인트 2\\n• 요약 포인트 3"
 }
 
 중요:
 - 반드시 유효한 JSON 객체 형식으로만 응답하세요
-- 기사 제목을 정확히 그대로 key로 사용하세요
+- key는 기사 URL을 정확히 그대로 사용하세요
+- 요약 가능한 기사만 포함하고, 요약 불가능한 기사는 제외하세요
 - JSON 외 다른 텍스트는 절대 포함하지 마세요
 `.trim();
 
   try {
     const response = await generateLLMResponse(prompt);
-    const summariesMap = parseJsonBatchSummaries(response);
+    const summariesByUrl = parseJsonBatchSummaries(response);
+
+    // Map URL-based results back to title-based results
+    const summariesMap: Record<string, string> = {};
+    articles.forEach((article) => {
+      const summary = summariesByUrl[article.url];
+
+      // Only include articles with valid summaries
+      if (summary) {
+        summariesMap[article.title] = summary;
+      }
+    });
+
     return summariesMap;
   } catch (error) {
     console.error("[LLM Service] Error summarizing articles batch:", error);

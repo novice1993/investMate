@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseClient } from "@/core/infrastructure/supabase.infra";
 
-// 1시간마다 자동 재검증 (Supabase에서 최신 데이터 조회)
-export const revalidate = 3600;
+// 10분마다 자동 재검증 (Cron 수집 주기와 동일)
+export const revalidate = 600;
 
 export async function GET() {
   try {
