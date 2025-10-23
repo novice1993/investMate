@@ -15,6 +15,15 @@ export async function register() {
       process.exit(1);
     }
 
+    // Initialize cron jobs (non-critical, server continues even if this fails)
+    try {
+      const { initializeCronJobs } = await import("./core/cron");
+      initializeCronJobs();
+    } catch (error) {
+      console.error("⚠️ [CRITICAL] Cron initialization failed:", error);
+      console.error("Server will continue, but scheduled tasks won't run.");
+    }
+
     // Register graceful shutdown hooks
     // process.on("SIGTERM", async () => {
     //   console.log("Received SIGTERM signal. Cleaning up...");
