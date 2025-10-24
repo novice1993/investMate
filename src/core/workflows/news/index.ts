@@ -1,25 +1,17 @@
-import { NewsArticle } from "@/core/entities/news.entity";
-import { ScrapedArticle } from "@/core/entities/scraped-article.entity";
-import { fetchMKSitemap } from "@/core/infrastructure/news.infra";
-import { parseMKSitemap, checkArticleExists, insertNewsArticles } from "@/core/services/news.service";
-import { scrapeArticle } from "@/core/services/scrape.service";
-import { summarizeArticlesBatch } from "../services/llm.service";
-
 /**
  * @fileoverview 뉴스 수집 워크플로우
- * sitemap 조회 → 중복 체크 → 스크래핑 → AI 요약 → 배치 저장
+ * sitemap 조회 → 중복 체크 → 스크래핑 → AI 개별 요약 → 배치 저장
  */
+
+import { NewsArticle } from "@/core/entities/news.entity";
+import { fetchMKSitemap } from "@/core/infrastructure/news.infra";
+import { parseMKSitemap, checkArticleExists, insertNewsArticles } from "@/core/services/news.service";
+import { createRPMState, splitIntoGroups, processGroupsWithRPMLimit } from "./rpm";
+import { NewsCollectionResult } from "./types";
 
 const MK_SITEMAP_URL = "https://www.mk.co.kr/sitemap/latest-articles";
 const ALLOWED_SECTIONS = ["economy", "business", "realestate", "stock", "it", "politics"];
-
-export interface NewsCollectionResult {
-  success: boolean;
-  collectedCount: number;
-  skippedCount: number;
-  errors: Array<{ url: string; error: string }>;
-  message: string;
-}
+const MAX_CONCURRENT_REQUESTS = 5;
 
 // ============================================================================
 // Public API
@@ -32,7 +24,7 @@ export interface NewsCollectionResult {
  * 1. 매경 sitemap에서 최신 기사 목록 조회
  * 2. 중복 체크 (직렬 처리)
  * 3. 이미 존재하는 기사 발견 시 중단 (이후 기사는 모두 처리됨)
- * 4. 새 기사는 병렬로 스크래핑 + AI 배치 요약 (1회 API 호출)
+ * 4. 새 기사는 병렬로 스크래핑 + AI 개별 요약 (각 기사마다 독립적 처리)
  * 5. 성공한 기사만 DB에 저장
  */
 export async function runNewsCollectionWorkflow(): Promise<NewsCollectionResult> {
@@ -53,8 +45,8 @@ export async function runNewsCollectionWorkflow(): Promise<NewsCollectionResult>
       return createSuccessResult(0, skippedCount, []);
     }
 
-    // 3. 배치 처리 (스크래핑 병렬 + AI 배치 요약)
-    const { processedArticles, errors } = await processBatch(itemsToProcess);
+    // 3. 개별 처리 (스크래핑 병렬 + AI 개별 요약)
+    const { processedArticles, errors } = await processArticles(itemsToProcess);
 
     // 4. DB 배치 저장
     if (processedArticles.length > 0) {
@@ -76,7 +68,6 @@ export async function runNewsCollectionWorkflow(): Promise<NewsCollectionResult>
 
 /**
  * 1단계: Sitemap 조회 및 파싱
- * @private
  */
 async function fetchAndParseSitemap(): Promise<NewsArticle[]> {
   console.log("[Workflow] Sitemap 조회 중...");
@@ -93,7 +84,6 @@ async function fetchAndParseSitemap(): Promise<NewsArticle[]> {
 
 /**
  * 2단계: 중복 체크 (직렬 처리)
- * @private
  */
 async function filterDuplicateArticles(newsList: NewsArticle[]): Promise<{ itemsToProcess: NewsArticle[]; skippedCount: number }> {
   const itemsToProcess: NewsArticle[] = [];
@@ -113,86 +103,24 @@ async function filterDuplicateArticles(newsList: NewsArticle[]): Promise<{ items
 }
 
 /**
- * 3단계: 배치 처리 (스크래핑 병렬 + AI 배치 요약)
- * @private
+ * 3단계: 개별 처리 (스크래핑 병렬 + AI 개별 요약)
+ * RPM 제한을 고려하여 5개씩 그룹으로 나눠 처리
  */
-async function processBatch(itemsToProcess: NewsArticle[]): Promise<{ processedArticles: NewsArticle[]; errors: Array<{ url: string; error: string }> }> {
-  console.log(`[Workflow] ${itemsToProcess.length}개 기사 배치 처리 시작`);
+async function processArticles(itemsToProcess: NewsArticle[]): Promise<{ processedArticles: NewsArticle[]; errors: Array<{ url: string; error: string }> }> {
+  console.log(`[Workflow] ${itemsToProcess.length}개 기사 개별 처리 시작`);
 
-  const scrapedMap = await scrapeArticles(itemsToProcess);
+  const groups = splitIntoGroups(itemsToProcess, MAX_CONCURRENT_REQUESTS);
+  const rpmState = createRPMState();
 
-  if (scrapedMap.size === 0) {
-    console.error(`[Workflow] 모든 기사 스크래핑 실패`);
-    return {
-      processedArticles: [],
-      errors: itemsToProcess.map((item) => ({ url: item.url, error: "스크래핑 실패" })),
-    };
-  }
+  const allResults = await processGroupsWithRPMLimit(groups, rpmState);
 
-  const summariesMap = await summarizeScrapedArticles(scrapedMap);
+  console.log(`[Workflow] 처리 완료: 성공 ${allResults.processedArticles.length}개, 실패 ${allResults.errors.length}개`);
 
-  return addSummariesToArticles(itemsToProcess, scrapedMap, summariesMap);
-}
-
-/**
- * 기사 스크래핑 (병렬 처리)
- * @private
- */
-async function scrapeArticles(items: NewsArticle[]): Promise<Map<string, ScrapedArticle>> {
-  console.log(`[Workflow] 스크래핑 중...`);
-  const results = await Promise.allSettled(items.map((item) => scrapeArticle(item.url)));
-
-  const scrapedMap = new Map<string, ScrapedArticle>();
-  results.forEach((result, idx) => {
-    if (result.status === "fulfilled") {
-      scrapedMap.set(items[idx].title, result.value);
-    }
-  });
-
-  return scrapedMap;
-}
-
-/**
- * 스크래핑된 기사 AI 배치 요약
- * @private
- */
-async function summarizeScrapedArticles(scrapedMap: Map<string, ScrapedArticle>): Promise<Record<string, string>> {
-  console.log(`[Workflow] AI 배치 요약 (${scrapedMap.size}개)...`);
-  return await summarizeArticlesBatch(Array.from(scrapedMap.values()));
-}
-
-/**
- * 기사 데이터에 요약 추가
- * @private
- */
-function addSummariesToArticles(
-  items: NewsArticle[],
-  scrapedMap: Map<string, ScrapedArticle>,
-  summariesMap: Record<string, string>
-): { processedArticles: NewsArticle[]; errors: Array<{ url: string; error: string }> } {
-  const processedArticles: NewsArticle[] = [];
-  const errors: Array<{ url: string; error: string }> = [];
-
-  items.forEach((newsItem) => {
-    const summary = summariesMap[newsItem.title];
-
-    if (!summary) {
-      const errorType = scrapedMap.has(newsItem.title) ? "AI 요약 실패" : "스크래핑 실패";
-      console.warn(`[Workflow] ✗ ${newsItem.title} - ${errorType}`);
-      errors.push({ url: newsItem.url, error: errorType });
-      return;
-    }
-
-    console.log(`[Workflow] ✓ ${newsItem.title}`);
-    processedArticles.push({ ...newsItem, summary });
-  });
-
-  return { processedArticles, errors };
+  return allResults;
 }
 
 /**
  * 4단계: DB 배치 저장
- * @private
  */
 async function saveArticlesToDatabase(articles: NewsArticle[]): Promise<void> {
   console.log(`[Workflow] ${articles.length}개 기사 DB 저장 중...`);
@@ -206,7 +134,6 @@ async function saveArticlesToDatabase(articles: NewsArticle[]): Promise<void> {
 
 /**
  * 성공 결과 생성
- * @private
  */
 function createSuccessResult(collectedCount: number, skippedCount: number, errors: Array<{ url: string; error: string }>): NewsCollectionResult {
   return {
@@ -220,7 +147,6 @@ function createSuccessResult(collectedCount: number, skippedCount: number, error
 
 /**
  * 에러 결과 생성
- * @private
  */
 function createErrorResult(error: unknown): NewsCollectionResult {
   return {
