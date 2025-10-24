@@ -1,6 +1,8 @@
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { breakpoints } from "../tokens/breakpoints.js";
+import { responsive } from "../tokens/responsive.js";
 
 // ES Module에서 __dirname 대체
 const __filename = fileURLToPath(import.meta.url);
@@ -59,5 +61,7 @@ export const mapTokens = () => {
     colors: semanticColors,
     spacing: semanticSpacing,
     typography: semanticTypography,
+    breakpoints: breakpoints,
+    responsive: responsive,
   };
 };

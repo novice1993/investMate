@@ -212,8 +212,8 @@ export default function MarketPage() {
             )}
           </div>
 
-          {/* 뉴스 섹션 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          {/* 뉴스 섹션 (PC만 표시) */}
+          <div className="desktop-only bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">실시간 뉴스</h3>
               <div className="flex items-center gap-3">
