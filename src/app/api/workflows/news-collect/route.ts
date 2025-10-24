@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runNewsCollectionWorkflow } from "@/core/workflows/news.workflow";
+import { runNewsCollectionWorkflow } from "@/core/workflows/news";
 
 /**
  * @fileoverview 뉴스 수집 워크플로우를 실행하는 API 엔드포인트

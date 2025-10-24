@@ -1,4 +1,5 @@
-import { runNewsCollectionWorkflow } from "@/core/workflows/news.workflow";
+import { runNewsCollectionWorkflow } from "@/core/workflows/news";
+import { isMutexLocked, acquireMutex, releaseMutex } from "../utils/mutex";
 
 export const newsCollectionJob = {
   name: "news-collection",
@@ -6,6 +7,15 @@ export const newsCollectionJob = {
   enabled: true,
 
   handler: async () => {
+    // 1. Mutex 상태 확인
+    if (isMutexLocked(newsCollectionJob.name)) {
+      console.log(`[Cron ${newsCollectionJob.name}] 이전 실행이 아직 진행 중, 스킵`);
+      return;
+    }
+
+    // 2. Mutex 획득
+    acquireMutex(newsCollectionJob.name);
+
     const startTime = Date.now();
 
     try {
@@ -23,6 +33,9 @@ export const newsCollectionJob = {
     } catch (error) {
       console.error(`[Cron ${newsCollectionJob.name}] ✗ Failed after ${Date.now() - startTime}ms:`, error instanceof Error ? error.message : "Unknown error");
       throw error;
+    } finally {
+      // 3. Mutex 해제
+      releaseMutex(newsCollectionJob.name);
     }
   },
 };
