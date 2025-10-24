@@ -39,7 +39,7 @@ export function NewsCard({ news, onClick }: NewsCardProps) {
       <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 leading-tight">{news.title}</h3>
 
       {/* 요약 */}
-      <p className="text-sm text-gray-600 line-clamp-3 mb-3">{news.summary}</p>
+      <p className="text-sm text-gray-600 mb-3 whitespace-pre-line">{news.summary}</p>
     </div>
   );
 }
