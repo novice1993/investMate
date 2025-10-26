@@ -7,10 +7,6 @@ import { useNewsData } from "../market/hooks/useNewsData";
 export default function NewsPage() {
   const { news, loading, error, fetchNewsData } = useNewsData();
 
-  const handleNewsClick = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
   return (
     <div className="container mx-auto p-4 md:p-6">
       {/* 헤더 */}
@@ -41,7 +37,7 @@ export default function NewsPage() {
         <>
           <div className="grid grid-cols-1 gap-4">
             {news.map((newsItem) => (
-              <NewsCard key={newsItem.id} news={newsItem} onClick={() => handleNewsClick(newsItem.url)} />
+              <NewsCard key={newsItem.id} news={newsItem} />
             ))}
           </div>
           <div className="text-center py-4 text-sm text-gray-400">총 {news.length}개의 뉴스</div>
