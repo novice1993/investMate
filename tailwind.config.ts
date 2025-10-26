@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { responsivePlugin } from "./src/styles/tailwind.plugin.js";
 import tailwindTheme from "./src/styles/tailwind.theme.js";
 
 const config: Config = {
@@ -14,6 +15,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [responsivePlugin],
 };
 export default config;

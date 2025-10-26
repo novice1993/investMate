@@ -121,10 +121,6 @@ export default function MarketPage() {
     setSelectedStock(stock);
   };
 
-  const handleNewsClick = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
   return (
     <div className="container mx-auto p-6 min-h-full">
       <div className="mb-6">
@@ -212,8 +208,8 @@ export default function MarketPage() {
             )}
           </div>
 
-          {/* 뉴스 섹션 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          {/* 뉴스 섹션 (PC만 표시) */}
+          <div className="desktop-only bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">실시간 뉴스</h3>
               <div className="flex items-center gap-3">
@@ -238,7 +234,7 @@ export default function MarketPage() {
             ) : news.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {news.map((newsItem) => (
-                  <NewsCard key={newsItem.id} news={newsItem} onClick={() => handleNewsClick(newsItem.url)} />
+                  <NewsCard key={newsItem.id} news={newsItem} />
                 ))}
                 <div className="text-center py-2 text-xs text-gray-400">총 {news.length}개의 뉴스</div>
               </div>

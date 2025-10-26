@@ -1,12 +1,19 @@
 import { runNewsCollectionWorkflow } from "@/core/workflows/news";
+import { shouldRunCronJob } from "../utils/enabled";
 import { isMutexLocked, acquireMutex, releaseMutex } from "../utils/mutex";
+
+const ENV_KEY = "ENABLE_NEWS_COLLECTION_CRON";
 
 export const newsCollectionJob = {
   name: "news-collection",
   schedule: "*/10 * * * *", // 10분마다 실행
-  enabled: true,
 
   handler: async () => {
+    // 0. 환경 변수로 실행 여부 확인 (로컬에서 Render와 중복 방지)
+    if (!shouldRunCronJob(newsCollectionJob.name, ENV_KEY)) {
+      return;
+    }
+
     // 1. Mutex 상태 확인
     if (isMutexLocked(newsCollectionJob.name)) {
       console.log(`[Cron ${newsCollectionJob.name}] 이전 실행이 아직 진행 중, 스킵`);
