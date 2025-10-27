@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { NewsCard } from "../components/NewsCard";
-import { useNewsData } from "../market/hooks/useNewsData";
+import { NewsCard } from "@/components/news/NewsCard";
+import { useNewsData } from "@/hooks/useNewsData";
 
 export default function NewsPage() {
   const { news, loading, error, fetchNewsData } = useNewsData();

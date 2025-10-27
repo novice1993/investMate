@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useEffect } from "react";
+import { NewsCard } from "@/components/news/NewsCard";
+import { StockCard } from "@/components/stocks/StockCard";
+import { StockDetailView } from "@/components/stocks/StockDetailView";
 import { Security } from "@/core/entities/security.entity";
+import { useNewsData } from "@/hooks/useNewsData";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
-import { NewsCard } from "../components/NewsCard";
-import { StockCard } from "../components/StockCard";
-import { StockDetailView } from "../components/StockDetailView";
-import { useNewsData } from "./hooks/useNewsData";
 import { useStockData } from "./hooks/useStockData";
 
 // 가상화 리스트 설정
