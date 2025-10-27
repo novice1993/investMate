@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useNewsData } from "@/hooks/useNewsData";
+import { VirtualizedList } from "@/shared/components/VirtualizedList";
 import { DateFilter } from "./DateFilter";
 import { NewsCard } from "./NewsCard";
 import { QuickFilterType, DateRange } from "./types";
@@ -28,8 +29,6 @@ export function NewsListSection({ variant = "full", showHeader = true, showFilte
     setFilterType(newFilterType);
     setCustomRange(newCustomRange);
   };
-
-  const containerClass = variant === "compact" ? "space-y-3" : "space-y-4";
 
   return (
     <div className={className}>
@@ -68,11 +67,18 @@ export function NewsListSection({ variant = "full", showHeader = true, showFilte
         </div>
       ) : filteredNews.length > 0 ? (
         <>
-          <div className={`grid grid-cols-1 gap-4 ${containerClass}`}>
-            {filteredNews.map((newsItem) => (
-              <NewsCard key={newsItem.id} news={newsItem} />
-            ))}
-          </div>
+          <VirtualizedList
+            items={filteredNews}
+            estimateSize={180}
+            containerHeight={variant === "compact" ? 400 : 600}
+            overscanCount={15}
+            renderItem={(newsItem, measureElement) => (
+              <div ref={(node) => measureElement(node)} className="px-4 py-2">
+                <NewsCard news={newsItem} />
+              </div>
+            )}
+            className="border rounded-md"
+          />
           <div className="text-center py-4 text-sm text-gray-400">
             총 {filteredNews.length}개의 뉴스 {news.length !== filteredNews.length && `(전체 ${news.length}개)`}
           </div>
