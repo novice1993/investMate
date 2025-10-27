@@ -171,10 +171,10 @@ export default function MarketPage() {
             {processedStocks.length > 0 ? (
               <VirtualizedList
                 items={processedStocks}
-                itemHeight={ITEM_HEIGHT}
+                estimateSize={ITEM_HEIGHT}
                 containerHeight={containerHeight}
-                renderItem={(stock) => (
-                  <div className="flex justify-center items-center h-full">
+                renderItem={(stock, measureElement) => (
+                  <div ref={(node) => measureElement(node)} className="flex justify-center items-center h-full">
                     <StockCard security={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
                   </div>
                 )}
