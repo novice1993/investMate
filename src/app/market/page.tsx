@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useEffect } from "react";
+import { NewsListSection } from "@/components/news/NewsListSection";
+import { StockCard } from "@/components/stocks/StockCard";
+import { StockDetailView } from "@/components/stocks/StockDetailView";
 import { Security } from "@/core/entities/security.entity";
 import { VirtualizedList } from "@/shared/components/VirtualizedList";
-import { NewsCard } from "../components/NewsCard";
-import { StockCard } from "../components/StockCard";
-import { StockDetailView } from "../components/StockDetailView";
-import { useNewsData } from "./hooks/useNewsData";
 import { useStockData } from "./hooks/useStockData";
 
 // 가상화 리스트 설정
@@ -25,7 +24,6 @@ export default function MarketPage() {
 
   // Custom hooks for data management
   const { stocks, loading, error, fetchStockData } = useStockData();
-  const { news, loading: newsLoading, error: newsError, fetchNewsData } = useNewsData();
 
   // 필터링 및 정렬을 위한 상태
   const [searchTerm, setSearchTerm] = useState("");
@@ -173,10 +171,10 @@ export default function MarketPage() {
             {processedStocks.length > 0 ? (
               <VirtualizedList
                 items={processedStocks}
-                itemHeight={ITEM_HEIGHT}
+                estimateSize={ITEM_HEIGHT}
                 containerHeight={containerHeight}
-                renderItem={(stock) => (
-                  <div className="flex justify-center items-center h-full">
+                renderItem={(stock, measureElement) => (
+                  <div ref={(node) => measureElement(node)} className="flex justify-center items-center h-full">
                     <StockCard security={stock} onClick={() => handleStockClick(stock)} className="hover:scale-105" />
                   </div>
                 )}
@@ -210,41 +208,7 @@ export default function MarketPage() {
 
           {/* 뉴스 섹션 (PC만 표시) */}
           <div className="desktop-only bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">실시간 뉴스</h3>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">매일경제 증권 · 한국경제 경제/증권</span>
-                <button onClick={fetchNewsData} disabled={newsLoading} className="bg-green-500 hover:bg-green-700 text-white font-medium py-1 px-3 rounded disabled:bg-gray-400 text-xs">
-                  {newsLoading ? "로딩중..." : "새로고침"}
-                </button>
-              </div>
-            </div>
-
-            {newsError && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 border border-red-400 rounded text-sm">
-                <p className="font-semibold">뉴스 로딩 오류:</p>
-                <p>{newsError}</p>
-              </div>
-            )}
-
-            {newsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-gray-500">뉴스를 불러오는 중...</div>
-              </div>
-            ) : news.length > 0 ? (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {news.map((newsItem) => (
-                  <NewsCard key={newsItem.id} news={newsItem} />
-                ))}
-                <div className="text-center py-2 text-xs text-gray-400">총 {news.length}개의 뉴스</div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">📰</div>
-                <p>뉴스 데이터가 없습니다</p>
-                <p className="text-sm mt-1">뉴스 불러오기 버튼을 클릭해보세요</p>
-              </div>
-            )}
+            <NewsListSection variant="compact" showHeader={false} showFilter={true} className="max-h-96 overflow-y-auto" />
           </div>
         </div>
       </div>
