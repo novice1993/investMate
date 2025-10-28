@@ -5,7 +5,7 @@ import { fetchArticleHtml } from "../infrastructure/scrape.infra";
 /**
  * 주어진 URL의 기사에서 제목과 본문을 스크래핑합니다.
  * @param url 스크래핑할 기사 페이지의 URL
- * @returns 스크래핑된 제목과 본문을 담은 ScrapedArticle 객체
+ * @returns 스크래핑된 URL, 제목, 본문을 담은 ScrapedArticle 객체
  */
 export async function scrapeArticle(url: string): Promise<ScrapedArticle> {
   const htmlContent = await fetchArticleHtml(url);
@@ -22,5 +22,5 @@ export async function scrapeArticle(url: string): Promise<ScrapedArticle> {
     throw new Error("Failed to scrape title and body from the article.");
   }
 
-  return { title, body };
+  return { url, title, body };
 }

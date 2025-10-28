@@ -26,6 +26,8 @@ export const colorTokens = ${JSON.stringify(tokens.colors, null, 2)};
 export const spacingTokens = ${JSON.stringify(tokens.spacing, null, 2)};
 
 export const typographyTokens = ${JSON.stringify(tokens.typography, null, 2)};
+
+export const breakpointTokens = ${JSON.stringify(tokens.breakpoints, null, 2)};
 `;
 
   writeFileSync(TARGET_PATH, content, "utf8");

@@ -1,4 +1,4 @@
-import { initializeKisToken, initializeGemini, cleanupApplication } from "@/core/services/initialization.service";
+import { initializeKisToken, initializeGemini, initializeSupabase, cleanupApplication } from "@/core/services/initialization.service";
 
 export async function register() {
   // This check ensures this code runs only in the Node.js runtime, not on the Edge.
@@ -6,25 +6,35 @@ export async function register() {
     console.log("Starting application initialization in Node.js runtime...");
 
     try {
-      await initializeKisToken();
+      // await initializeKisToken();
       await initializeGemini();
+      await initializeSupabase();
       console.log("Application initialization finished successfully.");
     } catch (error) {
       console.error("Critical error during application initialization. Server might be in an unstable state.");
       process.exit(1);
     }
 
-    // Register graceful shutdown hooks
-    process.on("SIGTERM", async () => {
-      console.log("Received SIGTERM signal. Cleaning up...");
-      await cleanupApplication();
-      process.exit(0);
-    });
+    // Initialize cron jobs (non-critical, server continues even if this fails)
+    try {
+      const { initializeCronJobs } = await import("./core/cron");
+      initializeCronJobs();
+    } catch (error) {
+      console.error("⚠️ [CRITICAL] Cron initialization failed:", error);
+      console.error("Server will continue, but scheduled tasks won't run.");
+    }
 
-    process.on("SIGINT", async () => {
-      console.log("Received SIGINT signal. Cleaning up...");
-      await cleanupApplication();
-      process.exit(0);
-    });
+    // Register graceful shutdown hooks
+    // process.on("SIGTERM", async () => {
+    //   console.log("Received SIGTERM signal. Cleaning up...");
+    //   await cleanupApplication();
+    //   process.exit(0);
+    // });
+
+    // process.on("SIGINT", async () => {
+    //   console.log("Received SIGINT signal. Cleaning up...");
+    //   await cleanupApplication();
+    //   process.exit(0);
+    // });
   }
 }

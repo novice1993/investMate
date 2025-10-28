@@ -1,4 +1,6 @@
 import { issueKisToken, revokeKisToken } from "@/core/infrastructure/kis.auth.infra";
+import { initializeGeminiClient } from "@/core/infrastructure/llm.infra";
+import { initializeSupabaseClient } from "@/core/infrastructure/supabase.infra";
 import { getAuthToken, setAuthToken, clearAuthToken } from "@/core/services/kis.auth.service";
 
 /**
@@ -19,10 +21,27 @@ export async function initializeKisToken() {
 }
 
 /**
- * Gemini AI 인스턴스를 생성하는 초기화 함수 (향후 구현)
+ * Gemini AI 인스턴스를 생성하는 초기화 함수
  */
 export async function initializeGemini() {
-  // Placeholder for future implementation
+  try {
+    initializeGeminiClient();
+  } catch (error) {
+    console.error("Error during Gemini initialization:", error);
+    throw error;
+  }
+}
+
+/**
+ * Supabase 클라이언트를 생성하는 초기화 함수
+ */
+export async function initializeSupabase() {
+  try {
+    initializeSupabaseClient();
+  } catch (error) {
+    console.error("Error during Supabase initialization:", error);
+    throw error;
+  }
 }
 
 /**
@@ -42,6 +61,5 @@ export async function cleanupApplication() {
 
   // 내부 메모리(클로저 변수)에 저장된 토큰을 정리합니다.
   clearAuthToken();
-
   console.log("Cleanup finished.");
 }

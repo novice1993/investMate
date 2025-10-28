@@ -7,10 +7,11 @@ export function Navigation() {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/", label: "홈", icon: "🏠" },
-    { href: "/market", label: "시장 전체보기", icon: "📊" },
-    { href: "/screener", label: "종목 스크리너", icon: "🔍" },
-    { href: "/tracker", label: "실시간 트래커", icon: "⚡" },
+    { href: "/", label: "홈", icon: "🏠", mobileOnly: false },
+    { href: "/market", label: "시장 전체보기", icon: "📊", mobileOnly: false },
+    { href: "/news", label: "뉴스", icon: "📰", mobileOnly: true },
+    { href: "/screener", label: "종목 스크리너", icon: "🔍", mobileOnly: false },
+    { href: "/tracker", label: "실시간 트래커", icon: "⚡", mobileOnly: false },
   ];
 
   return (
@@ -35,7 +36,7 @@ export function Navigation() {
                   href={item.href}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-100"
-                  }`}
+                  } ${item.mobileOnly ? "mobile-only" : ""}`}
                 >
                   <span>{item.icon}</span>
                   <span>{item.label}</span>
