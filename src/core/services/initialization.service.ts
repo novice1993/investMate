@@ -1,7 +1,7 @@
-import { issueKisToken, revokeKisToken } from "@/core/infrastructure/kis.auth.infra";
+import { issueKisToken, revokeKisToken } from "@/core/infrastructure/kis-auth.infra";
 import { initializeGeminiClient } from "@/core/infrastructure/llm.infra";
 import { initializeSupabaseClient } from "@/core/infrastructure/supabase.infra";
-import { getAuthToken, setAuthToken, clearAuthToken } from "@/core/services/kis.auth.service";
+import { getAuthToken, setAuthToken, clearAuthToken } from "@/core/services/kis-auth.service";
 
 /**
  * KIS 인증 토큰을 발급받아 메모리에 저장하는 초기화 함수

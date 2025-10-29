@@ -1,5 +1,5 @@
 import { Security } from "@/core/entities/security.entity";
-import { securityRepository, SecurityRepository } from "@/core/infrastructure/security.infra";
+import { YfinanceSecurityRepository } from "@/core/infrastructure/security-yfinance.infra";
 
 /**
  * 금융 상품 관련 비즈니스 로직을 처리하는 서비스 인터페이스입니다.
@@ -18,12 +18,12 @@ export interface SecurityService {
 
 /**
  * SecurityService 인터페이스의 구현체입니다.
- * securityRepository를 사용하여 데이터를 조회합니다.
+ * YfinanceSecurityRepository를 사용하여 데이터를 조회합니다.
  */
 export const securityService: SecurityService = {
   getSecurityBySymbol: async (symbol: string): Promise<Security | null> => {
     // 여기에서 추가적인 비즈니스 로직 (예: 캐싱, 데이터 유효성 검사 등)을 구현할 수 있습니다.
-    const security = await securityRepository.findBySymbol(symbol);
+    const security = await YfinanceSecurityRepository.findBySymbol(symbol);
     return security;
   },
 };

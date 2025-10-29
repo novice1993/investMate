@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { KrxSecurityRepository } from "../src/core/infrastructure/_security.krx.infra";
+import { KrxSecurityRepository } from "../src/core/infrastructure/security-krx.infra";
 
 async function main() {
   console.log("Fetching KOSPI market securities from KRX...");
