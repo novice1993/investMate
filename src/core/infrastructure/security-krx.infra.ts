@@ -2,29 +2,25 @@ import iconv from "iconv-lite";
 import Papa from "papaparse";
 import { Security } from "@/core/entities/security.entity";
 import { RawKrxRow } from "@/core/types/security.type";
+import { HttpError } from "@/shared/lib/http";
 
 const OTP_URL = "http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd";
 const DOWNLOAD_URL = "http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd";
 
 /**
- * KRX 데이터 시스템에서 종목 목록을 가져오는 리포지토리 구현체
+ * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 조회합니다.
  */
-export const KrxSecurityRepository = {
-  /**
-   * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 조회합니다.
-   */
-  async getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
-    try {
-      const marketId = market === "KOSPI" ? "STK" : "KSQ";
-      const otp = await generateOtp(marketId);
-      return await downloadAndParseSecurities(otp, market);
-    } catch (error) {
-      console.error("[KrxSecurityRepository] Failed to get market securities:", error);
-      // 에러 발생 시 빈 배열을 반환하여, 전체 시스템의 장애로 이어지지 않도록 합니다.
-      return [];
-    }
-  },
-};
+export async function getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
+  try {
+    const marketId = market === "KOSPI" ? "STK" : "KSQ";
+    const otp = await generateOtp(marketId);
+    return await downloadAndParseSecurities(otp, market);
+  } catch (error) {
+    console.error("[KRX] Failed to get market securities:", error);
+    // 에러 발생 시 빈 배열을 반환하여, 전체 시스템의 장애로 이어지지 않도록 합니다.
+    return [];
+  }
+}
 
 /**
  * KRX 서버에 OTP 생성을 요청합니다.
@@ -46,7 +42,8 @@ async function generateOtp(marketId: string): Promise<string> {
   });
 
   if (!otpResponse.ok) {
-    throw new Error(`Failed to generate OTP: ${otpResponse.statusText}`);
+    // HttpError로 일관된 에러 형식 사용
+    throw new HttpError(otpResponse, { message: `Failed to generate OTP: ${otpResponse.statusText}` });
   }
   return otpResponse.text();
 }
@@ -58,7 +55,8 @@ async function downloadAndParseSecurities(otp: string, market: "KOSPI" | "KOSDAQ
   const downloadResponse = await fetch(`${DOWNLOAD_URL}?code=${otp}`);
 
   if (!downloadResponse.ok) {
-    throw new Error(`Failed to download CSV: ${downloadResponse.statusText}`);
+    // HttpError로 일관된 에러 형식 사용
+    throw new HttpError(downloadResponse, { message: `Failed to download CSV: ${downloadResponse.statusText}` });
   }
 
   const buffer = await downloadResponse.arrayBuffer();

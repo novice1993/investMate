@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { KrxSecurityRepository } from "@/core/infrastructure/security-krx.infra";
+import { getMarketSecurities } from "@/core/infrastructure/security-krx.infra";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const securities = await KrxSecurityRepository.getMarketSecurities(market);
+    const securities = await getMarketSecurities(market);
     return NextResponse.json(securities);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal Server Error";
