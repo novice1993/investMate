@@ -69,6 +69,10 @@ function extractXmlFromZip(zipBuffer: Buffer): string {
 
 /**
  * XML 문자열을 파싱하여 DartCorp 배열로 변환합니다.
+ *
+ * 타입 보장:
+ * - XML 파싱 라이브러리가 자동으로 타입 추론을 수행하므로 (예: stockCode를 number로 파싱)
+ * - Infrastructure 레이어에서 명시적으로 string 타입으로 변환하여 타입 안정성 보장
  */
 function parseCorpCodeXml(xmlContent: string): DartCorp[] {
   const parser = new XMLParser({
@@ -89,9 +93,9 @@ function parseCorpCodeXml(xmlContent: string): DartCorp[] {
   const items: RawDartCorpXml[] = Array.isArray(listData) ? listData : [listData];
 
   return items.map((item) => ({
-    corpCode: item.corp_code || "",
-    corpName: item.corp_name || "",
-    stockCode: item.stock_code || "",
-    modifyDate: item.modify_date || "",
+    corpCode: String(item.corp_code || ""),
+    corpName: String(item.corp_name || ""),
+    stockCode: String(item.stock_code || ""),
+    modifyDate: String(item.modify_date || ""),
   }));
 }
