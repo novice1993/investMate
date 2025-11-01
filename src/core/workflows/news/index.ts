@@ -4,8 +4,9 @@
  */
 
 import { NewsArticle } from "@/core/entities/news.entity";
-import { fetchMKSitemap } from "@/core/infrastructure/news.infra";
-import { parseMKSitemap, checkArticleExists, insertNewsArticles } from "@/core/services/news.service";
+import { checkArticleExists, insertNewsArticles } from "@/core/infrastructure/news/repository.infra";
+import { fetchMKSitemap } from "@/core/infrastructure/news/sitemap.infra";
+import { parseMKSitemap } from "@/core/services/news-parser.service";
 import { createRPMState, splitIntoGroups, processGroupsWithRPMLimit } from "./rpm";
 import { NewsCollectionResult } from "./types";
 

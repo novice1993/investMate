@@ -1,7 +1,9 @@
-import { issueKisToken, revokeKisToken } from "@/core/infrastructure/kis-auth.infra";
-import { initializeGeminiClient } from "@/core/infrastructure/llm.infra";
-import { initializeSupabaseClient } from "@/core/infrastructure/supabase.infra";
-import { getAuthToken, setAuthToken, clearAuthToken } from "@/core/services/kis-auth.service";
+import { initializeGeminiClient } from "@/core/infrastructure/common/llm.infra";
+import { initializeSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
+import { issueKisToken, revokeKisToken } from "@/core/infrastructure/market/kis-auth.infra";
+import { getCached, setCache, clearCache } from "@/shared/lib/utils/cache";
+
+const KIS_TOKEN_KEY = "kis-auth-token";
 
 /**
  * KIS 인증 토큰을 발급받아 메모리에 저장하는 초기화 함수
@@ -10,7 +12,7 @@ export async function initializeKisToken() {
   try {
     const tokenResponse = await issueKisToken();
     if (tokenResponse && tokenResponse.access_token) {
-      setAuthToken(tokenResponse.access_token);
+      setCache(KIS_TOKEN_KEY, tokenResponse.access_token);
     } else {
       throw new Error("Invalid response from KIS token API.");
     }
@@ -49,7 +51,7 @@ export async function initializeSupabase() {
  */
 export async function cleanupApplication() {
   console.log("Graceful shutdown initiated. Cleaning up resources...");
-  const currentToken = getAuthToken();
+  const currentToken = getCached<string>(KIS_TOKEN_KEY);
   if (currentToken) {
     try {
       await revokeKisToken(currentToken);
@@ -60,6 +62,6 @@ export async function cleanupApplication() {
   }
 
   // 내부 메모리(클로저 변수)에 저장된 토큰을 정리합니다.
-  clearAuthToken();
+  clearCache(KIS_TOKEN_KEY);
   console.log("Cleanup finished.");
 }

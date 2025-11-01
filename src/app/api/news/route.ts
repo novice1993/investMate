@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseClient } from "@/core/infrastructure/supabase.infra";
+import { fetchNewsArticles } from "@/core/infrastructure/news/repository.infra";
 
 // 10분마다 자동 재검증 (Cron 수집 주기와 동일)
 export const revalidate = 600;
 
 export async function GET() {
   try {
-    const supabase = getSupabaseClient();
-
-    const { data: news, error } = await supabase.from("news_articles").select("*").order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(`Supabase 조회 실패: ${error.message}`);
-    }
+    const news = await fetchNewsArticles(100);
 
     return NextResponse.json({
       success: true,

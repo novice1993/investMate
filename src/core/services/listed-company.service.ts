@@ -1,6 +1,6 @@
 import type { Stock, Company, ListedCompany, Market } from "@/core/entities/listed-company.entity";
-import { getAllDartCorpCodes } from "@/core/infrastructure/dart.infra";
-import { getMarketStockCodes } from "@/core/infrastructure/security-krx.infra";
+import { getAllDartCorpCodes } from "@/core/infrastructure/financial/dart.infra";
+import { getMarketStockCodes } from "@/core/infrastructure/market/krx.infra";
 
 /**
  * @fileoverview 상장 법인 비즈니스 로직

@@ -1,13 +1,10 @@
-import { ScrapedArticle } from "../entities/scraped-article.entity";
-import { generateLLMResponse } from "../infrastructure/llm.infra";
+import { ScrapedArticle } from "@/core/entities/scraped-article.entity";
+import { generateLLMResponse } from "@/core/infrastructure/common/llm.infra";
 
 /**
- * Takes an article and returns a summary.
- * @param article The article object with title and body.
- * @returns The summarized text, or null if summarization fails.
+ * 기본 기사 요약 프롬프트 템플릿
  */
-export async function summarizeArticle(article: ScrapedArticle): Promise<string | null> {
-  const prompt = `
+export const DEFAULT_ARTICLE_SUMMARY_PROMPT = `
 다음 기사를 7-10개의 불릿 포인트로 요약하세요.
 
 규칙:
@@ -30,17 +27,24 @@ export async function summarizeArticle(article: ScrapedArticle): Promise<string 
 ---
 
 요약할 기사:
-제목: ${article.title}
-본문: ${article.body}
+제목: {{title}}
+본문: {{body}}
 
 출력:
 `.trim();
+
+/**
+ * 기사를 요약합니다.
+ */
+export async function summarizeArticle(article: ScrapedArticle, promptTemplate: string = DEFAULT_ARTICLE_SUMMARY_PROMPT): Promise<string | null> {
+  // 프롬프트 템플릿에 실제 값 대입
+  const prompt = promptTemplate.replace("{{title}}", article.title).replace("{{body}}", article.body);
 
   try {
     const summary = await generateLLMResponse(prompt);
     return summary.trim();
   } catch (error) {
-    console.error("[LLM Service] Error summarizing article:", error);
+    console.error("[News Summarizer] Error summarizing article:", error);
     return null;
   }
 }

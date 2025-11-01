@@ -50,16 +50,19 @@ export function getGeminiClient(): GoogleGenAI {
 }
 
 /**
- * Generates text using the configured LLM.
- * @param prompt The full prompt to send to the model.
- * @returns The generated text.
+ * 기본 LLM 모델
  */
-export async function generateLLMResponse(prompt: string): Promise<string> {
+export const DEFAULT_LLM_MODEL = "gemini-2.0-flash-exp";
+
+/**
+ * Generates text using the configured LLM.
+ */
+export async function generateLLMResponse(prompt: string, model: string = DEFAULT_LLM_MODEL): Promise<string> {
   const genAI = getGeminiClient();
 
   try {
     const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash-lite",
+      model,
       contents: prompt,
     });
     const text = response.text;

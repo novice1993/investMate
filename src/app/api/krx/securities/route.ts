@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMarketSecurities } from "@/core/infrastructure/security-krx.infra";
+import { getMarketSecurities } from "@/core/infrastructure/market/krx.infra";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
