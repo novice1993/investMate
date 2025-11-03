@@ -78,6 +78,7 @@ function parseCorpCodeXml(xmlContent: string): DartCorp[] {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
+    parseTagValue: false, // 숫자 자동 변환 방지 (corp_code의 앞 0 유지)
   });
 
   const parsed = parser.parse(xmlContent);

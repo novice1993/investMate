@@ -63,11 +63,22 @@ type QuarterlyStatements = {
 /**
  * 누적 데이터를 단독 분기 실적으로 변환합니다.
  *
- * DART API는 누적 데이터만 제공하므로, 단독 분기 실적을 계산해야 합니다.
- * - Q1: 그대로 사용
- * - Q2: 반기누적 - Q1
- * - Q3: 3분기누적 - 반기누적
- * - Q4: 연간누적 - 3분기누적
+ * DART API는 누적 데이터를 제공합니다:
+ * - Q1: 1분기 실적 (단독과 동일)
+ * - Q2: 1~2분기 누적
+ * - Q3: 1~3분기 누적
+ * - Q4: 1~4분기 누적 (연간)
+ *
+ * 변환 결과 (단독 분기):
+ * - Q1: 1분기만
+ * - Q2: 2분기만 (Q2 누적 - Q1)
+ * - Q3: 3분기만 (Q3 누적 - Q2 누적)
+ * - Q4: 4분기만 (Q4 누적 - Q3 누적)
+ *
+ * 사용 예시:
+ * - 특정 분기 실적만 집중 분석
+ * - 단독 분기 기준 YoY 계산 (선택적)
+ * - 분기별 계절성 패턴 분석
  *
  * @param cumulative 누적 재무제표 (같은 연도의 Q1, Q2, Q3, Q4)
  * @returns 단독 분기 실적
@@ -116,21 +127,30 @@ export function convertToStandaloneQuarter(cumulative: QuarterlyStatements): Qua
 /**
  * YoY (Year-over-Year) 성장률을 계산합니다.
  *
- * 주의: 단독 분기 실적을 사용해야 정확한 YoY를 계산할 수 있습니다.
+ * 권장 사용법: 누적 데이터 기준
+ * - DART API는 누적 데이터를 제공하므로, 그대로 사용 권장
+ * - 예: 2025 Q3 누적(1~3분기) vs 2024 Q3 누적(1~3분기)
+ * - 분기별 계절성 영향 제거, 안정적인 성장 트렌드 파악
+ * - 증권업계 표준 방식
  *
- * @param currentStandalone 현재 단독 분기 실적
- * @param previousStandalone 전년 동기 단독 분기 실적
+ * 선택적 사용법: 단독 분기 기준
+ * - convertToStandaloneQuarter()로 변환 후 사용 가능
+ * - 예: 2025 Q3 단독 vs 2024 Q3 단독
+ * - 특정 분기 실적만 집중 분석할 때 사용
+ *
+ * @param current 현재 분기 재무제표 (누적 또는 단독)
+ * @param previous 전년 동기 재무제표 (누적 또는 단독)
  * @returns YoY 성장률 (%)
  */
-export function calculateYoYGrowth(currentStandalone: FinancialStatement, previousStandalone: FinancialStatement): YoYGrowth {
+export function calculateYoYGrowth(current: FinancialStatement, previous: FinancialStatement): YoYGrowth {
   const calculateGrowth = (current: number, previous: number): number => {
     if (previous === 0) return 0;
     return ((current - previous) / previous) * 100;
   };
 
   return {
-    revenueGrowth: calculateGrowth(currentStandalone.revenue, previousStandalone.revenue),
-    operatingProfitGrowth: calculateGrowth(currentStandalone.operatingProfit, previousStandalone.operatingProfit),
-    netIncomeGrowth: calculateGrowth(currentStandalone.netIncome, previousStandalone.netIncome),
+    revenueGrowth: calculateGrowth(current.revenue, previous.revenue),
+    operatingProfitGrowth: calculateGrowth(current.operatingProfit, previous.operatingProfit),
+    netIncomeGrowth: calculateGrowth(current.netIncome, previous.netIncome),
   };
 }
