@@ -1,7 +1,7 @@
 import AdmZip from "adm-zip";
 import { XMLParser } from "fast-xml-parser";
-import { DartCorp, RawDartCorpXml } from "@/core/types/dart.type";
 import { HttpError } from "@/shared/lib/http";
+import { DartCorp, RawDartCorpXml } from "./dart.type";
 
 const DART_APP_KEY = process.env.DART_APP_KEY;
 const CORP_CODE_URL = "https://opendart.fss.or.kr/api/corpCode.xml";

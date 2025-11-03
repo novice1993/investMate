@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { NewsArticle } from "@/core/entities/news.entity";
-import { MkSitemap, MkSitemapUrl } from "@/core/types/news.type";
+import { MkSitemap, MkSitemapUrl } from "@/core/infrastructure/news/news.type";
 
 /**
  * 뉴스 관련 비즈니스 로직 - 사이트맵 XML 파싱 및 변환

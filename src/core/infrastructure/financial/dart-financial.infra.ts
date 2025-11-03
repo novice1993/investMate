@@ -1,6 +1,6 @@
 import { FinancialStatement } from "@/core/entities/financial.entity";
-import { FetchFinancialStatementParams, DartFinancialResponse, RawDartFinancialAccount } from "@/core/types/financial.type";
 import { jsonHttpClient } from "@/shared/lib/http";
+import { FetchFinancialStatementParams, DartFinancialResponse, RawDartFinancialAccount } from "./financial.type";
 
 const DART_APP_KEY = process.env.DART_APP_KEY;
 const FINANCIAL_STATEMENT_URL = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json";
