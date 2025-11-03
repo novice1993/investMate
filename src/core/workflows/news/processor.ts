@@ -4,8 +4,8 @@
  */
 
 import { NewsArticle } from "@/core/entities/news.entity";
-import { summarizeArticle } from "@/core/services/llm.service";
-import { scrapeArticle } from "@/core/services/scrape.service";
+import { scrapeArticle } from "@/core/services/news-scraper.service";
+import { summarizeArticle } from "@/core/services/news-summarizer.service";
 import { ProcessingResults } from "./types";
 
 /**
