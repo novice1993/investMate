@@ -1,11 +1,48 @@
 import { FinancialStatement, FinancialRatios, YoYGrowth } from "@/core/entities/financial.entity";
+import { fetchMultipleFinancialStatements } from "@/core/infrastructure/financial/dart-financial.infra";
+import { getKospiListedCompanies } from "./listed-company.service";
 
 /**
  * 재무 분석 서비스
  * - 재무비율 계산 (ROE, 부채비율, 영업이익률, 순이익률)
  * - 누적 데이터 → 단독 분기 변환
  * - YoY 성장률 계산
+ * - KOSPI 기업 배치 지표 계산
  */
+
+// ============================================================================
+// Public Types
+// ============================================================================
+
+/**
+ * 재무 지표 계산 결과
+ */
+export interface FinancialMetrics {
+  corpCode: string;
+  stockCode?: string;
+  year: string;
+  quarter: number;
+  revenue: number;
+  operatingProfit: number;
+  netIncome: number;
+  totalEquity: number;
+  revenueYoY: number;
+  operatingProfitYoY: number;
+  netIncomeYoY: number;
+  roe: number;
+}
+
+/**
+ * 배치 계산 결과
+ */
+export interface BatchMetricsResult {
+  success: FinancialMetrics[];
+  failed: string[];
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
 
 /**
  * TTM 기반 ROE를 계산합니다.
@@ -52,6 +89,10 @@ export function calculateFinancialRatios(statement: FinancialStatement, corpName
     netMargin,
   };
 }
+
+// ============================================================================
+// Private Types
+// ============================================================================
 
 type QuarterlyStatements = {
   q1?: FinancialStatement;
@@ -153,4 +194,65 @@ export function calculateYoYGrowth(current: FinancialStatement, previous: Financ
     operatingProfitGrowth: calculateGrowth(current.operatingProfit, previous.operatingProfit),
     netIncomeGrowth: calculateGrowth(current.netIncome, previous.netIncome),
   };
+}
+
+/**
+ * KOSPI 전체 기업의 재무 지표를 계산합니다.
+ *
+ * @param year 조회 연도 (예: "2025")
+ * @param quarter 분기 코드 (1분기: "11013", 2분기: "11012", 3분기: "11014", 4분기: "11011")
+ * @returns 계산된 지표와 실패 목록
+ */
+export async function calculateKospiFinancialMetrics(year: string, quarter: "11011" | "11012" | "11013" | "11014"): Promise<BatchMetricsResult> {
+  // 1. KOSPI 기업 목록 조회
+  const companies = await getKospiListedCompanies();
+  const corpCodes = companies.map((c) => c.company.id);
+
+  // 2. 100개씩 배치 처리
+  const BATCH_SIZE = 100;
+  const success: FinancialMetrics[] = [];
+  const failed: string[] = [];
+
+  const previousYear = (parseInt(year) - 1).toString();
+
+  for (let i = 0; i < corpCodes.length; i += BATCH_SIZE) {
+    const batch = corpCodes.slice(i, i + BATCH_SIZE);
+
+    // 현재 & 전년 동기 데이터 병렬 조회
+    const [currentResult, previousResult] = await Promise.all([
+      fetchMultipleFinancialStatements(batch, { bsns_year: year, reprt_code: quarter, fs_div: "CFS" }),
+      fetchMultipleFinancialStatements(batch, { bsns_year: previousYear, reprt_code: quarter, fs_div: "CFS" }),
+    ]);
+
+    // 각 기업별 지표 계산
+    for (const corpCode of batch) {
+      const current = currentResult.data.get(corpCode);
+      const previous = previousResult.data.get(corpCode);
+
+      if (!current || !previous) {
+        failed.push(corpCode);
+        continue;
+      }
+
+      const yoy = calculateYoYGrowth(current, previous);
+      const roe = calculateTTMROE(current.netIncome, current.totalEquity, previous.totalEquity);
+
+      success.push({
+        corpCode,
+        stockCode: current.stockCode,
+        year: current.year,
+        quarter: current.quarter,
+        revenue: current.revenue,
+        operatingProfit: current.operatingProfit,
+        netIncome: current.netIncome,
+        totalEquity: current.totalEquity,
+        revenueYoY: yoy.revenueGrowth,
+        operatingProfitYoY: yoy.operatingProfitGrowth,
+        netIncomeYoY: yoy.netIncomeGrowth,
+        roe,
+      });
+    }
+  }
+
+  return { success, failed };
 }
