@@ -22,14 +22,25 @@ export interface FinancialMetrics {
   stockCode?: string;
   year: string;
   quarter: number;
+
+  // 재무제표 원본
   revenue: number;
   operatingProfit: number;
   netIncome: number;
+  totalAssets: number;
+  totalLiabilities: number;
   totalEquity: number;
+
+  // YoY 성장률
   revenueYoY: number;
   operatingProfitYoY: number;
   netIncomeYoY: number;
+
+  // 수익성/안전성 지표
   roe: number;
+  debtRatio: number;
+  operatingMargin: number;
+  netMargin: number;
 }
 
 /**
@@ -214,15 +225,26 @@ export async function calculateKospiFinancialMetrics(year: string, quarter: "110
   const failed: string[] = [];
 
   const previousYear = (parseInt(year) - 1).toString();
+  const isQ4 = quarter === "11011";
 
   for (let i = 0; i < corpCodes.length; i += BATCH_SIZE) {
     const batch = corpCodes.slice(i, i + BATCH_SIZE);
 
     // 현재 & 전년 동기 데이터 병렬 조회
-    const [currentResult, previousResult] = await Promise.all([
+    // Q4가 아닌 경우 전년도 연간(Q4) 데이터 추가 조회 (TTM 계산용)
+    const fetchPromises = [
       fetchMultipleFinancialStatements(batch, { bsns_year: year, reprt_code: quarter, fs_div: "CFS" }),
       fetchMultipleFinancialStatements(batch, { bsns_year: previousYear, reprt_code: quarter, fs_div: "CFS" }),
-    ]);
+    ];
+
+    if (!isQ4) {
+      fetchPromises.push(fetchMultipleFinancialStatements(batch, { bsns_year: previousYear, reprt_code: "11011", fs_div: "CFS" }));
+    }
+
+    const results = await Promise.all(fetchPromises);
+    const currentResult = results[0];
+    const previousResult = results[1];
+    const previousYearQ4Result = !isQ4 ? results[2] : undefined;
 
     // 각 기업별 지표 계산
     for (const corpCode of batch) {
@@ -234,8 +256,32 @@ export async function calculateKospiFinancialMetrics(year: string, quarter: "110
         continue;
       }
 
+      // TTM 순이익 계산
+      let ttmNetIncome: number;
+      if (isQ4) {
+        // Q4는 연간 누적 데이터이므로 그대로 사용
+        ttmNetIncome = current.netIncome;
+      } else {
+        // Q1~Q3는 전년 연간 - 전년 동기 + 현재 분기로 TTM 계산
+        const previousYearQ4 = previousYearQ4Result?.data.get(corpCode);
+        if (!previousYearQ4) {
+          failed.push(corpCode);
+          continue;
+        }
+        ttmNetIncome = previousYearQ4.netIncome - previous.netIncome + current.netIncome;
+      }
+
       const yoy = calculateYoYGrowth(current, previous);
-      const roe = calculateTTMROE(current.netIncome, current.totalEquity, previous.totalEquity);
+      const roe = calculateTTMROE(ttmNetIncome, current.totalEquity, previous.totalEquity);
+
+      // 부채비율 = (부채총계 / 자본총계) × 100
+      const debtRatio = current.totalEquity !== 0 ? (current.totalLiabilities / current.totalEquity) * 100 : 0;
+
+      // 영업이익률 = (영업이익 / 매출액) × 100
+      const operatingMargin = current.revenue !== 0 ? (current.operatingProfit / current.revenue) * 100 : 0;
+
+      // 순이익률 = (순이익 / 매출액) × 100
+      const netMargin = current.revenue !== 0 ? (current.netIncome / current.revenue) * 100 : 0;
 
       success.push({
         corpCode,
@@ -245,11 +291,16 @@ export async function calculateKospiFinancialMetrics(year: string, quarter: "110
         revenue: current.revenue,
         operatingProfit: current.operatingProfit,
         netIncome: current.netIncome,
+        totalAssets: current.totalAssets,
+        totalLiabilities: current.totalLiabilities,
         totalEquity: current.totalEquity,
         revenueYoY: yoy.revenueGrowth,
         operatingProfitYoY: yoy.operatingProfitGrowth,
         netIncomeYoY: yoy.netIncomeGrowth,
         roe,
+        debtRatio,
+        operatingMargin,
+        netMargin,
       });
     }
   }

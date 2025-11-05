@@ -115,7 +115,7 @@ function parseFinancialStatementEntity(accounts: RawDartFinancialAccount[], corp
   // 손익계산서 (누적 데이터)
   const revenue = findAccountAmount(accounts, "매출액");
   const operatingProfit = findAccountAmount(accounts, "영업이익");
-  const netIncome = findAccountAmountWithFallback(accounts, ["분기순이익", "분기순이익(손실)", "반기순이익", "당기순이익"]);
+  const netIncome = findAccountAmountWithFallback(accounts, ["당기순이익(손실)", "분기순이익", "분기순이익(손실)", "반기순이익", "당기순이익"]);
 
   return {
     corpCode,
