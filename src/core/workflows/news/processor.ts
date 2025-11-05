@@ -8,6 +8,10 @@ import { scrapeArticle } from "@/core/services/news-scraper.service";
 import { summarizeArticle } from "@/core/services/news-summarizer.service";
 import { ProcessingResults } from "./types";
 
+// ============================================================================
+// Public API
+// ============================================================================
+
 /**
  * 단일 그룹 처리 (병렬 스크래핑 + AI 요약)
  */
@@ -20,6 +24,10 @@ export async function processArticleGroup(group: NewsArticle[], groupIndex: numb
   const results = await scrapeAndSummarizeArticles(group);
   return classifyResults(results, group);
 }
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
 
 /**
  * 기사 스크래핑 + AI 요약 병렬 처리

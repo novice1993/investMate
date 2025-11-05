@@ -6,6 +6,10 @@ import { MkSitemap, MkSitemapUrl } from "@/core/infrastructure/news/news.type";
  * 뉴스 관련 비즈니스 로직 - 사이트맵 XML 파싱 및 변환
  */
 
+// ============================================================================
+// Public API
+// ============================================================================
+
 /**
  * 매경 사이트맵 XML을 NewsArticle 배열로 변환하는 함수
  */
@@ -22,6 +26,29 @@ export function parseMKSitemap(xmlData: string, allowedSections: string[]): News
 
   return filteredUrls.map(transformSitemapUrlToNewsArticle);
 }
+
+/**
+ * URL에서 섹션 정보를 추출합니다.
+ */
+export function extractSectionFromUrl(url: string): string {
+  try {
+    const urlPath = new URL(url).pathname;
+    const pathSegments = urlPath.split("/").filter(Boolean);
+
+    if (pathSegments.length > 1 && pathSegments[0] === "news") {
+      return pathSegments[1];
+    }
+
+    return "unknown";
+  } catch (error) {
+    console.error(`[News Service] URL 파싱 실패: ${url}`, error);
+    return "unknown";
+  }
+}
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
 
 /**
  * URL에서 섹션을 추출하여 허용된 섹션의 기사만 필터링하는 함수
@@ -58,23 +85,4 @@ function transformSitemapUrlToNewsArticle(sitemapUrl: MkSitemapUrl): NewsArticle
     source: newsItem["news:publication"]["news:name"],
     published_at: new Date(newsItem["news:publication_date"]).toISOString(),
   };
-}
-
-/**
- * URL에서 섹션 정보를 추출합니다.
- */
-export function extractSectionFromUrl(url: string): string {
-  try {
-    const urlPath = new URL(url).pathname;
-    const pathSegments = urlPath.split("/").filter(Boolean);
-
-    if (pathSegments.length > 1 && pathSegments[0] === "news") {
-      return pathSegments[1];
-    }
-
-    return "unknown";
-  } catch (error) {
-    console.error(`[News Service] URL 파싱 실패: ${url}`, error);
-    return "unknown";
-  }
 }

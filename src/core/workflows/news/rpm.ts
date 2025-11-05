@@ -12,6 +12,10 @@ const MAX_CONCURRENT_REQUESTS = 5; // 한 번에 최대 5개씩 병렬 처리
 const RPM_LIMIT = 15; // Gemini 2.5 Flash-Lite RPM 제한
 const SAFE_WINDOW_MS = 80000; // 60초 + 20초 안전 여유
 
+// ============================================================================
+// Public API
+// ============================================================================
+
 /**
  * RPM 상태 초기화
  */
@@ -59,6 +63,10 @@ export async function processGroupsWithRPMLimit(groups: NewsArticle[][], rpmStat
 
   return { processedArticles, errors };
 }
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
 
 /**
  * RPM 초과 여부 확인 및 대기

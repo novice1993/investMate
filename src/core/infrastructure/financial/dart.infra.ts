@@ -6,6 +6,10 @@ import { DartCorp, RawDartCorpXml } from "./dart.type";
 const DART_APP_KEY = process.env.DART_APP_KEY;
 const CORP_CODE_URL = "https://opendart.fss.or.kr/api/corpCode.xml";
 
+// ============================================================================
+// Public API
+// ============================================================================
+
 /**
  * DART에서 전체 기업 고유번호 목록을 조회합니다.
  * ZIP 파일을 다운로드하고 압축을 해제한 후 XML을 파싱합니다.
@@ -33,6 +37,10 @@ export async function getAllDartCorpCodes(): Promise<DartCorp[]> {
     return [];
   }
 }
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
 
 /**
  * DART API에서 ZIP 파일을 다운로드합니다.

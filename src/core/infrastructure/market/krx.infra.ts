@@ -8,6 +8,50 @@ import { RawKrxRow } from "./security.type";
 const OTP_URL = "http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd";
 const DOWNLOAD_URL = "http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd";
 
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 Security 엔티티 형태로 반환합니다.
+ */
+export async function getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
+  const rawData = await fetchAndCacheKrxRawData(market);
+
+  return rawData.map((row) => ({
+    symbol: row["종목코드"],
+    name: row["종목명"],
+    price: safeParseFloat(row["종가"]),
+    change: safeParseFloat(row["대비"]),
+    changePercent: safeParseFloat(row["등락률"]),
+    market: market,
+    currency: "KRW",
+    country: "KR",
+    source: "KRX",
+    volume: safeParseFloat(row["거래량"]),
+    marketCap: safeParseFloat(row["시가총액"]),
+  }));
+}
+
+/**
+ * KOSPI 또는 KOSDAQ 시장의 종목 코드와 이름만 반환합니다.
+ * DART 등 다른 시스템과의 매칭에 사용됩니다.
+ */
+export async function getMarketStockCodes(market: "KOSPI" | "KOSDAQ"): Promise<{ symbol: string; name: string }[]> {
+  const rawData = await fetchAndCacheKrxRawData(market);
+
+  return rawData
+    .map((row) => ({
+      symbol: row["종목코드"],
+      name: row["종목명"],
+    }))
+    .filter((item) => item.symbol && item.name);
+}
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
+
 /**
  * KRX API에서 원본 CSV 데이터를 가져와서 캐싱합니다.
  * 이 함수는 내부적으로만 사용되며, KRX API 호출을 최소화하기 위해 캐싱을 수행합니다.
@@ -49,42 +93,6 @@ async function fetchAndCacheKrxRawData(market: "KOSPI" | "KOSDAQ"): Promise<RawK
     console.error(`[KRX] Failed to fetch raw data for ${market}:`, error);
     return [];
   }
-}
-
-/**
- * KOSPI 또는 KOSDAQ 시장의 전체 종목 목록을 Security 엔티티 형태로 반환합니다.
- */
-export async function getMarketSecurities(market: "KOSPI" | "KOSDAQ"): Promise<Partial<Security>[]> {
-  const rawData = await fetchAndCacheKrxRawData(market);
-
-  return rawData.map((row) => ({
-    symbol: row["종목코드"],
-    name: row["종목명"],
-    price: safeParseFloat(row["종가"]),
-    change: safeParseFloat(row["대비"]),
-    changePercent: safeParseFloat(row["등락률"]),
-    market: market,
-    currency: "KRW",
-    country: "KR",
-    source: "KRX",
-    volume: safeParseFloat(row["거래량"]),
-    marketCap: safeParseFloat(row["시가총액"]),
-  }));
-}
-
-/**
- * KOSPI 또는 KOSDAQ 시장의 종목 코드와 이름만 반환합니다.
- * DART 등 다른 시스템과의 매칭에 사용됩니다.
- */
-export async function getMarketStockCodes(market: "KOSPI" | "KOSDAQ"): Promise<{ symbol: string; name: string }[]> {
-  const rawData = await fetchAndCacheKrxRawData(market);
-
-  return rawData
-    .map((row) => ({
-      symbol: row["종목코드"],
-      name: row["종목명"],
-    }))
-    .filter((item) => item.symbol && item.name);
 }
 
 /**
