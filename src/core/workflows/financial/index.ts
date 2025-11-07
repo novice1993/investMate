@@ -1,51 +1,110 @@
 /**
- * @fileoverview KOSPI 기업 재무 지표 계산 워크플로우
+ * @fileoverview KOSPI 기업 재무 지표 계산 및 저장 워크플로우
+ *
+ * 프로세스:
+ * 1. 재무 데이터 수집 (Query Strategy Service - Fallback 포함)
+ * 2. 재무 지표 계산 (Analysis Service)
+ * 3. 계산 성공한 데이터를 Supabase에 Upsert
+ * 4. 결과 로깅
  */
 
-import { calculateKospiFinancialMetrics, FinancialMetrics } from "@/core/services/financial-analysis.service";
+import { upsertBulkFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
+import { FinancialMetrics } from "@/core/services/financial-analysis.service";
+import { getLatestAvailableQuarter, QuarterCode } from "@/core/services/financial-query-strategy.service";
+import { getKospiListedCompanies } from "@/core/services/listed-company.service";
+import { processFinancialMetrics } from "./processor";
+import { createErrorResult, createSuccessResult, logCalculationComplete, logWorkflowComplete, logWorkflowError, logWorkflowStart } from "./result";
+import { CompanyInfo, FinancialMetricsWorkflowResult } from "./types";
 
-export interface FinancialMetricsWorkflowResult {
-  success: boolean;
-  totalCompanies: number;
-  processedCount: number;
-  failedCount: number;
-  metrics: FinancialMetrics[];
-  failedCorpCodes: string[];
-  message: string;
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * KOSPI 기업 재무 지표 계산 및 저장 워크플로우 실행
+ *
+ * @param year 조회 연도 (생략 시 최신 분기 자동 결정)
+ * @param quarter 분기 코드 (생략 시 최신 분기 자동 결정)
+ * @returns 워크플로우 실행 결과
+ */
+export async function runFinancialMetricsWorkflow(year?: string, quarter?: QuarterCode): Promise<FinancialMetricsWorkflowResult> {
+  try {
+    // 1. 분기 결정
+    const target = year && quarter ? { year, quarter } : getLatestAvailableQuarter();
+    logWorkflowStart(target.year, target.quarter);
+
+    // 2. 기업 목록 및 매핑 준비
+    const companies = await getKospiListedCompanies();
+    const corpCodes = companies.map((c) => c.company.id);
+    const companyMap = createCompanyMap(companies);
+
+    // 3. 배치 처리 및 지표 계산
+    const { metrics, failed } = await processFinancialMetrics(corpCodes, companyMap, target.year, target.quarter);
+
+    logCalculationComplete(metrics.length, corpCodes.length);
+
+    // 4. DB 저장
+    const savedCount = await saveToDatabase(metrics);
+
+    // 5. 결과 생성 및 로깅
+    const result = createSuccessResult(metrics, failed, savedCount);
+    logWorkflowComplete(result);
+
+    // 6. 실패한 기업 상세 로깅 (corpName)
+    if (failed.length > 0) {
+      const failedCompanyNames = failed.map((corpCode) => companyMap.get(corpCode)?.name || corpCode);
+      console.warn(`[Workflow Financial] Failed companies (${failed.length}):`, failedCompanyNames);
+    }
+
+    return result;
+  } catch (error) {
+    logWorkflowError(error);
+    return createErrorResult(error);
+  }
+}
+
+// ============================================================================
+// Re-export Types
+// ============================================================================
+
+export type { FinancialMetricsWorkflowResult } from "./types";
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
+
+/**
+ * 기업 정보 매핑을 생성합니다.
+ *
+ * @param companies 기업 목록
+ * @returns corpCode → CompanyInfo 매핑
+ */
+function createCompanyMap(companies: Awaited<ReturnType<typeof getKospiListedCompanies>>): Map<string, CompanyInfo> {
+  return new Map(
+    companies.map((c) => [
+      c.company.id,
+      {
+        name: c.company.name,
+        stockCode: c.company.stockCode,
+      },
+    ])
+  );
 }
 
 /**
- * KOSPI 기업 재무 지표 계산 워크플로우 실행
+ * 재무 지표를 데이터베이스에 저장합니다.
+ *
+ * @param metrics 저장할 재무 지표 배열
+ * @returns 저장된 건수
  */
-export async function runFinancialMetricsWorkflow(year: string, quarter: "11011" | "11012" | "11013" | "11014"): Promise<FinancialMetricsWorkflowResult> {
-  try {
-    const result = await calculateKospiFinancialMetrics(year, quarter);
-
-    const totalCompanies = result.success.length + result.failed.length;
-
-    // TODO: DB 저장
-    // if (result.success.length > 0) {
-    //   await saveFinancialMetricsToDB(result.success);
-    // }
-
-    return {
-      success: true,
-      totalCompanies,
-      processedCount: result.success.length,
-      failedCount: result.failed.length,
-      metrics: result.success,
-      failedCorpCodes: result.failed,
-      message: `${result.success.length}/${totalCompanies} companies processed`,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      totalCompanies: 0,
-      processedCount: 0,
-      failedCount: 0,
-      metrics: [],
-      failedCorpCodes: [],
-      message: error instanceof Error ? error.message : "Unknown error",
-    };
+async function saveToDatabase(metrics: FinancialMetrics[]): Promise<number> {
+  if (metrics.length === 0) {
+    return 0;
   }
+
+  console.log(`[Workflow Financial] Saving ${metrics.length} records to DB...`);
+  await upsertBulkFinancialMetrics(metrics);
+  console.log(`[Workflow Financial] ✓ Saved ${metrics.length} records`);
+
+  return metrics.length;
 }

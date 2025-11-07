@@ -18,6 +18,7 @@ import { getKospiListedCompanies } from "./listed-company.service";
  */
 export interface FinancialMetrics {
   corpCode: string;
+  corpName: string;
   stockCode?: string;
   year: string;
   quarter: number;
@@ -55,6 +56,44 @@ export interface BatchMetricsResult {
 // ============================================================================
 
 /**
+ * 수집된 재무 데이터에서 지표를 계산합니다 (순수 함수).
+ *
+ * @param corpCode 기업 고유번호
+ * @param corpName 기업명
+ * @param stockCode 종목 코드
+ * @param current 현재 분기 재무제표
+ * @param previous 전년 동기 재무제표
+ * @param previousYearQ4 전년도 연간 재무제표 (Q4가 아닐 때만)
+ * @returns 계산된 재무 지표 (실패 시 null)
+ */
+export function calculateFinancialMetricsFromData(
+  corpCode: string,
+  corpName: string,
+  stockCode: string,
+  current: FinancialStatement,
+  previous: FinancialStatement,
+  previousYearQ4?: FinancialStatement
+): FinancialMetrics | null {
+  const quarter = current.quarter;
+  const quarterCode = getQuarterCode(quarter);
+
+  const metrics = calculateCompanyMetrics(current, previous, previousYearQ4, quarterCode);
+
+  if (!metrics) {
+    return null;
+  }
+
+  return {
+    ...metrics,
+    stockCode,
+    corpName,
+  };
+}
+
+/**
+ * @deprecated 레거시 함수 - Workflow에서 직접 사용하지 마세요.
+ * 대신 getLatestAvailableQuarter + fetchFinancialDataWithFallback + calculateFinancialMetricsFromData 조합 사용
+ *
  * KOSPI 전체 기업의 재무 지표를 계산합니다.
  *
  * @param year 조회 연도 (예: "2025")
@@ -62,34 +101,71 @@ export interface BatchMetricsResult {
  * @returns 계산된 지표와 실패 목록
  */
 export async function calculateKospiFinancialMetrics(year: string, quarter: "11011" | "11012" | "11013" | "11014"): Promise<BatchMetricsResult> {
+  // KOSPI 기업 목록 및 기업명 매핑 준비
   const companies = await getKospiListedCompanies();
   const corpCodes = companies.map((c) => c.company.id);
 
-  const BATCH_SIZE = 100;
+  // 빠른 기업명 조회를 위한 Map 생성 (O(1) 조회)
+  const companyNameMap = new Map(companies.map((c) => [c.company.id, c.company.name]));
+  // 빠른 종목코드 조회를 위한 Map 생성 (O(1) 조회)
+  const stockCodeMap = new Map(companies.map((c) => [c.company.id, c.company.stockCode]));
+
+  const BATCH_SIZE = 50;
   const success: FinancialMetrics[] = [];
   const failed: string[] = [];
+  const unmappedCorpCodes: string[] = [];
 
   for (let i = 0; i < corpCodes.length; i += BATCH_SIZE) {
     const batch = corpCodes.slice(i, i + BATCH_SIZE);
     const { current, previous, previousYearQ4 } = await fetchBatchFinancialData(batch, year, quarter);
 
     for (const corpCode of batch) {
-      const currentData = current.get(corpCode);
-      const previousData = previous.get(corpCode);
+      let currentData = current.get(corpCode);
+      let previousData = previous.get(corpCode);
 
       if (!currentData || !previousData) {
         failed.push(corpCode);
         continue;
       }
 
+      // DART Financial API는 stockCode를 반환하지 않으므로, ListedCompany에서 매핑
+      const stockCode = stockCodeMap.get(corpCode);
+      if (!stockCode) {
+        console.warn(`[Financial Analysis] Stock code not found for corpCode: ${corpCode}`);
+        failed.push(corpCode);
+        continue;
+      }
+
+      // stockCode 설정 (DART API 응답에는 없으므로 수동 매핑)
+      currentData = { ...currentData, stockCode };
+      previousData = { ...previousData, stockCode };
+
       const metrics = calculateCompanyMetrics(currentData, previousData, previousYearQ4?.get(corpCode), quarter);
 
       if (metrics) {
-        success.push(metrics);
+        const corpName = companyNameMap.get(corpCode);
+
+        // 기업명 매핑 실패 시 로깅 및 추적
+        if (!corpName) {
+          console.warn(`[Financial Analysis] Corp name not found for corpCode: ${corpCode}`);
+          unmappedCorpCodes.push(corpCode);
+          failed.push(corpCode);
+          continue;
+        }
+
+        success.push({
+          ...metrics,
+          corpName,
+        });
       } else {
         failed.push(corpCode);
       }
     }
+  }
+
+  // 매핑 실패 종목 최종 로깅
+  if (unmappedCorpCodes.length > 0) {
+    console.error(`[Financial Analysis] ${unmappedCorpCodes.length} companies failed corp_name mapping:`, unmappedCorpCodes);
   }
 
   return { success, failed };
@@ -98,6 +174,19 @@ export async function calculateKospiFinancialMetrics(year: string, quarter: "110
 // ============================================================================
 // Private Helpers
 // ============================================================================
+
+/**
+ * 분기 번호를 분기 코드로 변환합니다.
+ */
+function getQuarterCode(quarter: number): "11011" | "11012" | "11013" | "11014" {
+  const map: Record<number, "11011" | "11012" | "11013" | "11014"> = {
+    1: "11013", // Q1
+    2: "11012", // Q2
+    3: "11014", // Q3
+    4: "11011", // Q4
+  };
+  return map[quarter];
+}
 
 /**
  * TTM 기반 ROE를 계산합니다.
@@ -240,14 +329,14 @@ async function fetchBatchFinancialData(
  * @param previous 전년 동기 재무제표
  * @param previousYearQ4 전년도 연간 재무제표
  * @param quarter 분기 코드
- * @returns 계산된 재무 지표 (실패 시 null)
+ * @returns 계산된 재무 지표 (corpName 제외, 실패 시 null)
  */
 function calculateCompanyMetrics(
   current: FinancialStatement,
   previous: FinancialStatement,
   previousYearQ4: FinancialStatement | undefined,
   quarter: "11011" | "11012" | "11013" | "11014"
-): FinancialMetrics | null {
+): Omit<FinancialMetrics, "corpName"> | null {
   try {
     const ttmNetIncome = calculateTTMNetIncome(current, previous, previousYearQ4, quarter);
     const yoy = calculateYoYGrowth(current, previous);

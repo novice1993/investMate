@@ -56,7 +56,7 @@ export async function fetchMultipleFinancialStatementsRaw(
     return { data: groupedData, missing };
   } catch (error) {
     console.error(`[DART Multi] Failed to fetch:`, error);
-    throw error;
+    return { data: new Map(), missing: corpCodes };
   }
 }
 
