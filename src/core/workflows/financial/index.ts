@@ -38,19 +38,21 @@ export async function runFinancialMetricsWorkflow(year?: string, quarter?: Quart
     const corpCodes = companies.map((c) => c.company.id);
     const companyMap = createCompanyMap(companies);
 
-    // 3. 배치 처리 및 지표 계산
-    const { metrics, failed } = await processFinancialMetrics(corpCodes, companyMap, target.year, target.quarter);
+    // 3. 배치 처리 및 지표 계산 (배치마다 DB 저장)
+    const { totalProcessed, totalSaved, failed } = await processFinancialMetrics(corpCodes, companyMap, target.year, target.quarter, async (batchMetrics) => {
+      // 배치마다 즉시 DB 저장 (메모리 절약)
+      await saveBatchToDatabase(batchMetrics);
+    });
 
-    logCalculationComplete(metrics.length, corpCodes.length);
+    console.log(`[Workflow Financial] Processed: ${totalProcessed}, Saved: ${totalSaved}, Failed: ${failed.length}`);
+    logCalculationComplete(totalSaved, corpCodes.length);
 
-    // 4. DB 저장
-    const savedCount = await saveToDatabase(metrics);
-
-    // 5. 결과 생성 및 로깅
-    const result = createSuccessResult(metrics, failed, savedCount);
+    // 4. 결과 생성 및 로
+    // 깅
+    const result = createSuccessResult([], failed, totalSaved);
     logWorkflowComplete(result);
 
-    // 6. 실패한 기업 상세 로깅 (corpName)
+    // 5. 실패한 기업 상세 로깅 (corpName)
     if (failed.length > 0) {
       const failedCompanyNames = failed.map((corpCode) => companyMap.get(corpCode)?.name || corpCode);
       console.warn(`[Workflow Financial] Failed companies (${failed.length}):`, failedCompanyNames);
@@ -92,19 +94,15 @@ function createCompanyMap(companies: Awaited<ReturnType<typeof getKospiListedCom
 }
 
 /**
- * 재무 지표를 데이터베이스에 저장합니다.
+ * 배치 재무 지표를 데이터베이스에 즉시 저장합니다.
+ * 메모리 절약을 위해 배치마다 호출됩니다.
  *
- * @param metrics 저장할 재무 지표 배열
- * @returns 저장된 건수
+ * @param metrics 저장할 재무 지표 배열 (배치 단위)
  */
-async function saveToDatabase(metrics: FinancialMetrics[]): Promise<number> {
+async function saveBatchToDatabase(metrics: FinancialMetrics[]): Promise<void> {
   if (metrics.length === 0) {
-    return 0;
+    return;
   }
 
-  console.log(`[Workflow Financial] Saving ${metrics.length} records to DB...`);
   await upsertBulkFinancialMetrics(metrics);
-  console.log(`[Workflow Financial] ✓ Saved ${metrics.length} records`);
-
-  return metrics.length;
 }
