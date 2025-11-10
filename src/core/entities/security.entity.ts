@@ -21,5 +21,5 @@ export interface Security {
 
   // 추가 정보
   marketCap?: number; // 시가총액
-  source: "KRX" | "KIS" | "yfinance"; // 데이터 출처
+  source: "KRX" | "KIS"; // 데이터 출처
 }

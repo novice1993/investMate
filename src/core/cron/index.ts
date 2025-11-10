@@ -1,5 +1,7 @@
-import cron, { ScheduledTask } from "node-cron";
+import { ScheduledTask } from "node-cron";
+import { financialMetricsJob } from "./jobs/financial-metrics.job";
 import { newsCollectionJob } from "./jobs/news-collection.job";
+import { registerCronJob } from "./utils/register";
 
 const scheduledJobs: Map<string, ScheduledTask> = new Map();
 
@@ -15,17 +17,9 @@ export function initializeCronJobs() {
 
   console.log("[Cron] Initializing cron jobs...");
 
-  try {
-    // 뉴스 수집 job 등록
-    const task = cron.schedule(newsCollectionJob.schedule, newsCollectionJob.handler, {
-      timezone: "Asia/Seoul",
-    });
-
-    scheduledJobs.set(newsCollectionJob.name, task);
-    console.log(`[Cron] ✓ ${newsCollectionJob.name} scheduled: ${newsCollectionJob.schedule}`);
-  } catch (error) {
-    console.error(`[Cron] ✗ Failed to schedule ${newsCollectionJob.name}:`, error);
-  }
+  // Job 등록
+  registerCronJob(newsCollectionJob, scheduledJobs);
+  registerCronJob(financialMetricsJob, scheduledJobs);
 
   console.log("[Cron] All jobs initialized successfully");
 }

@@ -1,5 +1,5 @@
-import { KisTokenResponse, KisRevokeResponse } from "@/core/types/auth.type";
 import { jsonHttpClient } from "@/shared/lib/http";
+import { KisTokenResponse, KisRevokeResponse } from "./auth.type";
 
 const KIS_BASE_URL = process.env.KIS_BASE_URL;
 const APP_KEY = process.env.KIS_APP_KEY;
