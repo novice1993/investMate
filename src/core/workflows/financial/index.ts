@@ -8,10 +8,10 @@
  * 4. 결과 로깅
  */
 
+import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-stream.infra";
 import { upsertBulkFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
 import { FinancialMetrics } from "@/core/services/financial-analysis.service";
 import { getLatestAvailableQuarter, QuarterCode } from "@/core/services/financial-query-strategy.service";
-import { getKospiListedCompanies } from "@/core/services/listed-company.service";
 import { processFinancialMetrics } from "./processor";
 import { createErrorResult, createSuccessResult, logCalculationComplete, logWorkflowComplete, logWorkflowError, logWorkflowStart } from "./result";
 import { CompanyInfo, FinancialMetricsWorkflowResult } from "./types";
@@ -33,10 +33,10 @@ export async function runFinancialMetricsWorkflow(year?: string, quarter?: Quart
     const target = year && quarter ? { year, quarter } : getLatestAvailableQuarter();
     logWorkflowStart(target.year, target.quarter);
 
-    // 2. 기업 목록 및 매핑 준비
-    const companies = await getKospiListedCompanies();
-    const corpCodes = companies.map((c) => c.company.id);
-    const companyMap = createCompanyMap(companies);
+    // 2. 기업 목록 조회 및 Map 생성
+    const companies = await readKospiCorpMappingJson();
+    const corpCodes = companies.map((c) => c.corpCode);
+    const companyMap = createCompanyMapFromCompanies(companies);
 
     // 3. 배치 처리 및 지표 계산 (배치마다 DB 저장)
     const { totalProcessed, totalSaved, failed } = await processFinancialMetrics(corpCodes, companyMap, target.year, target.quarter, async (batchMetrics) => {
@@ -47,9 +47,8 @@ export async function runFinancialMetricsWorkflow(year?: string, quarter?: Quart
     console.log(`[Workflow Financial] Processed: ${totalProcessed}, Saved: ${totalSaved}, Failed: ${failed.length}`);
     logCalculationComplete(totalSaved, corpCodes.length);
 
-    // 4. 결과 생성 및 로
-    // 깅
-    const result = createSuccessResult([], failed, totalSaved);
+    // 4. 결과 생성 및 로깅
+    const result = createSuccessResult(corpCodes.length, failed, totalSaved);
     logWorkflowComplete(result);
 
     // 5. 실패한 기업 상세 로깅 (corpName)
@@ -78,16 +77,16 @@ export type { FinancialMetricsWorkflowResult } from "./types";
 /**
  * 기업 정보 매핑을 생성합니다.
  *
- * @param companies 기업 목록
+ * @param companies KOSPI 기업 목록
  * @returns corpCode → CompanyInfo 매핑
  */
-function createCompanyMap(companies: Awaited<ReturnType<typeof getKospiListedCompanies>>): Map<string, CompanyInfo> {
+function createCompanyMapFromCompanies(companies: Awaited<ReturnType<typeof readKospiCorpMappingJson>>): Map<string, CompanyInfo> {
   return new Map(
     companies.map((c) => [
-      c.company.id,
+      c.corpCode,
       {
-        name: c.company.name,
-        stockCode: c.company.stockCode,
+        name: c.corpName,
+        stockCode: c.stockCode,
       },
     ])
   );
