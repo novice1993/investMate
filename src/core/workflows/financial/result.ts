@@ -2,24 +2,23 @@
  * @fileoverview Financial Workflow 결과 처리 및 로깅
  */
 
-import { FinancialMetrics } from "@/core/services/financial-analysis.service";
 import { FinancialMetricsWorkflowResult } from "./types";
 
 /**
  * 성공 결과를 생성합니다.
  *
- * @param metrics 계산된 재무 지표 배열
+ * @param totalCompanies 전체 기업 수
  * @param failed 실패한 기업 코드 배열
  * @param savedCount DB에 저장된 건수
  * @returns 워크플로우 실행 결과
  */
-export function createSuccessResult(metrics: FinancialMetrics[], failed: string[], savedCount: number): FinancialMetricsWorkflowResult {
-  const totalCompanies = metrics.length + failed.length;
+export function createSuccessResult(totalCompanies: number, failed: string[], savedCount: number): FinancialMetricsWorkflowResult {
+  const processedCount = totalCompanies - failed.length;
 
   return {
     success: true,
     totalCompanies,
-    processedCount: metrics.length,
+    processedCount,
     savedCount,
     failedCount: failed.length,
     failedCorpCodes: failed,
