@@ -74,7 +74,6 @@ export function logWorkflowComplete(result: FinancialMetricsWorkflowResult): voi
   console.log(`[Workflow Financial] Completed:`, {
     saved: result.savedCount,
     failed: result.failedCount,
-    total: result.totalCompanies,
   });
 }
 

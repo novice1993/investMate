@@ -1,5 +1,5 @@
 import type { Stock, Company, ListedCompany, Market } from "@/core/entities/listed-company.entity";
-import { getAllDartCorpCodes } from "@/core/infrastructure/financial/dart.infra";
+import { getFilteredDartCorpCodes } from "@/core/infrastructure/financial/dart.infra";
 import { getMarketStockCodes } from "@/core/infrastructure/market/krx.infra";
 
 /**
@@ -22,27 +22,33 @@ import { getMarketStockCodes } from "@/core/infrastructure/market/krx.infra";
  *
  * 프로세스:
  * 1. KRX Infrastructure에서 시장별 종목 코드 조회
- * 2. DART Infrastructure에서 전체 기업 정보 조회
+ * 2. DART Infrastructure에서 필터링된 기업 정보 조회 (메모리 최적화)
  * 3. Infrastructure 데이터를 도메인 Entity로 변환
  * 4. 순수 비즈니스 로직으로 매칭 수행
  */
 export async function getListedCompaniesByMarket(market: Market): Promise<ListedCompany[]> {
   console.log(`[ListedCompanyService] Fetching ${market} listed companies...`);
 
-  // 1. Infrastructure에서 원본 데이터 가져오기
-  const [krxStockCodes, dartCorps] = await Promise.all([getMarketStockCodes(market), getAllDartCorpCodes()]);
+  // 1. KRX에서 시장별 종목 코드 조회
+  const krxStockCodes = await getMarketStockCodes(market);
 
   if (krxStockCodes.length === 0) {
     console.warn(`[ListedCompanyService] No stock codes found for ${market}`);
     return [];
   }
 
+  // 2. 종목코드 Set 생성 (DART 필터링용)
+  const stockCodeSet = new Set(krxStockCodes.map((code) => code.symbol));
+
+  // 3. DART에서 매칭되는 기업만 조회 (메모리 최적화: 114k → 958개만)
+  const dartCorps = await getFilteredDartCorpCodes(stockCodeSet);
+
   if (dartCorps.length === 0) {
     console.warn("[ListedCompanyService] No DART corporations found");
     return [];
   }
 
-  // 2. Infrastructure 데이터를 도메인 Entity로 변환
+  // 4. Infrastructure 데이터를 도메인 Entity로 변환
   const stocks: Stock[] = krxStockCodes.map((code) => ({
     symbol: code.symbol,
     name: code.name,
@@ -56,10 +62,10 @@ export async function getListedCompaniesByMarket(market: Market): Promise<Listed
     modifiedAt: corp.modifyDate,
   }));
 
-  // 3. 순수 비즈니스 로직 실행 (Helper 함수)
+  // 5. 순수 비즈니스 로직 실행 (Helper 함수)
   const listedCompanies = matchStocksWithCompanies(stocks, companies);
 
-  console.log(`[ListedCompanyService] Matched ${listedCompanies.length} ${market} companies ` + `(from ${stocks.length} stocks and ${companies.length} total companies)`);
+  console.log(`[ListedCompanyService] Matched ${listedCompanies.length} ${market} companies ` + `(from ${stocks.length} stocks and ${dartCorps.length} filtered companies)`);
 
   return listedCompanies;
 }

@@ -38,6 +38,37 @@ export async function getAllDartCorpCodes(): Promise<DartCorp[]> {
   }
 }
 
+/**
+ * DART에서 특정 종목코드와 매칭되는 기업만 조회합니다 (메모리 최적화).
+ *
+ * 114k+ 전체 기업을 메모리에 올리지 않고, 필터링하면서 매칭되는 것만 저장합니다.
+ *
+ * @param targetStockCodes 조회할 종목코드 Set (예: KOSPI 958개)
+ * @returns 매칭된 DartCorp 배열
+ */
+export async function getFilteredDartCorpCodes(targetStockCodes: Set<string>): Promise<DartCorp[]> {
+  try {
+    if (!DART_APP_KEY) {
+      throw new Error("DART_APP_KEY environment variable is not set");
+    }
+
+    // 1. ZIP 파일 다운로드
+    const zipBuffer = await downloadCorpCodeZip(DART_APP_KEY);
+
+    // 2. ZIP 압축 해제 및 XML 추출
+    const xmlContent = extractXmlFromZip(zipBuffer);
+
+    // 3. XML 파싱하면서 필터링 (메모리 최적화)
+    const corpCodes = parseCorpCodeXmlWithFilter(xmlContent, targetStockCodes);
+
+    console.log(`[DART] Successfully fetched ${corpCodes.length} corporations (filtered from 114k+)`);
+    return corpCodes;
+  } catch (error) {
+    console.error("[DART] Failed to get filtered corp codes:", error);
+    return [];
+  }
+}
+
 // ============================================================================
 // Private Helpers
 // ============================================================================
@@ -107,4 +138,52 @@ function parseCorpCodeXml(xmlContent: string): DartCorp[] {
     stockCode: String(item.stock_code || ""),
     modifyDate: String(item.modify_date || ""),
   }));
+}
+
+/**
+ * XML 문자열을 파싱하면서 필터링하여 DartCorp 배열로 변환합니다 (메모리 최적화).
+ *
+ * 114k 전체를 메모리에 올리지 않고, 매칭되는 것만 배열에 저장합니다.
+ *
+ * @param xmlContent XML 문자열
+ * @param targetStockCodes 필터링할 종목코드 Set
+ * @returns 매칭된 DartCorp 배열
+ */
+function parseCorpCodeXmlWithFilter(xmlContent: string, targetStockCodes: Set<string>): DartCorp[] {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+    parseTagValue: false,
+  });
+
+  const parsed = parser.parse(xmlContent);
+
+  const listData = parsed.result?.list;
+
+  if (!listData) {
+    throw new Error("Invalid XML structure: missing 'list' element");
+  }
+
+  const items: RawDartCorpXml[] = Array.isArray(listData) ? listData : [listData];
+
+  // 필터링: 매칭되는 것만 배열에 추가 (메모리 절약)
+  const filtered: DartCorp[] = [];
+
+  for (const item of items) {
+    const stockCode = String(item.stock_code || "");
+
+    // stockCode를 6자리로 정규화하여 비교
+    const normalizedStockCode = stockCode.padStart(6, "0");
+
+    if (targetStockCodes.has(normalizedStockCode)) {
+      filtered.push({
+        corpCode: String(item.corp_code || ""),
+        corpName: String(item.corp_name || ""),
+        stockCode,
+        modifyDate: String(item.modify_date || ""),
+      });
+    }
+  }
+
+  return filtered;
 }

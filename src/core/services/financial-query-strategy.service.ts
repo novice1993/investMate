@@ -110,10 +110,15 @@ export async function fetchFinancialDataWithFallback(corpCodes: string[], year: 
   const previousYear = (parseInt(year) - 1).toString();
 
   // 1차 시도: 목표 분기 데이터 조회
+  console.log(`\n[1차 시도] 목표 분기 데이터 조회 (${year} Q${quarter})`);
   const initialResults = await fetchInitialFinancialData(corpCodes, year, previousYear, quarter);
 
   // 실패한 기업 식별 (current, previous, previousYearQ4 중 하나라도 없으면 실패)
   const failedCorpCodes = identifyFailedCorpCodes(corpCodes, initialResults, quarter);
+
+  if (failedCorpCodes.length > 0) {
+    console.log(`\n[Fallback] ${failedCorpCodes.length}개 기업 이전 분기로 재시도`);
+  }
 
   // 2차 시도: 실패한 기업만 이전 분기로 Fallback
   const fallbackResults = await retryFailedCompaniesWithFallback(failedCorpCodes, year, previousYear, quarter);
@@ -191,6 +196,12 @@ async function fetchInitialFinancialData(
       ? fetchMultipleFinancialStatements(corpCodes, { bsns_year: previousYear, reprt_code: Q4_CODE, fs_div: "CFS" })
       : Promise.resolve({ data: new Map<string, FinancialStatement>(), missing: [] }),
   ]);
+
+  console.log(`  [current] ${year} ${quarter}: ${currentResult.data.size}/${corpCodes.length} success, ${currentResult.missing.length} missing`);
+  console.log(`  [previous] ${previousYear} ${quarter}: ${previousResult.data.size}/${corpCodes.length} success, ${previousResult.missing.length} missing`);
+  if (!isQ4) {
+    console.log(`  [previousYearQ4] ${previousYear} Q4: ${prevYearQ4Result.data.size}/${corpCodes.length} success, ${prevYearQ4Result.missing.length} missing`);
+  }
 
   return { currentResult, previousResult, prevYearQ4Result };
 }
