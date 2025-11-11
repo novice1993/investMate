@@ -1,0 +1,55 @@
+/**
+ * @fileoverview KOSPI Corp Mapping 동기화 워크플로우
+ *
+ * DART Corp 데이터를 스트리밍 방식으로 조회하여 JSON 파일로 저장합니다.
+ * 메모리 최적화: 114k 기업을 메모리에 올리지 않고 스트리밍 처리 (~70MB 사용)
+ */
+
+import path from "path";
+import { streamDartCorpToJson } from "@/core/infrastructure/financial/dart-stream.infra";
+import { getMarketStockCodes } from "@/core/infrastructure/market/krx.infra";
+
+export interface KospiMappingSyncResult {
+  success: boolean;
+  count: number;
+  message: string;
+}
+
+/**
+ * KOSPI corp mapping을 갱신하여 JSON 파일로 저장합니다.
+ *
+ * Cron: 하루 1회 실행 권장
+ *
+ * @returns 동기화 결과
+ */
+export async function syncKospiCorpMapping(): Promise<KospiMappingSyncResult> {
+  try {
+    console.log("[KOSPI Mapping Sync] Starting...");
+
+    // 1. KRX에서 KOSPI 종목 조회 (~1MB)
+    const krxStockCodes = await getMarketStockCodes("KOSPI");
+    console.log(`[KOSPI Mapping Sync] Fetched ${krxStockCodes.length} KOSPI stocks from KRX`);
+
+    // 2. 종목코드 Set 생성 (~0.05MB)
+    const stockCodeSet = new Set(krxStockCodes.map((c) => c.symbol));
+
+    // 3. 스트리밍 파싱 + 파일 직접 쓰기 (~70MB 피크)
+    const outputPath = path.join(process.cwd(), "data", "kospi_corp_mapping.json");
+    const { count } = await streamDartCorpToJson(stockCodeSet, outputPath);
+
+    console.log(`[KOSPI Mapping Sync] ✓ Saved ${count} mappings to ${outputPath}`);
+
+    return {
+      success: true,
+      count,
+      message: `${count} corp mappings synced`,
+    };
+  } catch (error) {
+    console.error("[KOSPI Mapping Sync] Failed:", error);
+    return {
+      success: false,
+      count: 0,
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

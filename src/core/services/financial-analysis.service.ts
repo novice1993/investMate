@@ -1,6 +1,6 @@
 import { FinancialStatement, YoYGrowth } from "@/core/entities/financial.entity";
 import { fetchMultipleFinancialStatements } from "@/core/infrastructure/financial/dart-financial.infra";
-import { getKospiListedCompanies } from "./listed-company.service";
+import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-stream.infra";
 
 /**
  * 재무 분석 서비스
@@ -102,13 +102,13 @@ export function calculateFinancialMetricsFromData(
  */
 export async function calculateKospiFinancialMetrics(year: string, quarter: "11011" | "11012" | "11013" | "11014"): Promise<BatchMetricsResult> {
   // KOSPI 기업 목록 및 기업명 매핑 준비
-  const companies = await getKospiListedCompanies();
-  const corpCodes = companies.map((c) => c.company.id);
+  const companies = await readKospiCorpMappingJson();
+  const corpCodes = companies.map((c) => c.corpCode);
 
   // 빠른 기업명 조회를 위한 Map 생성 (O(1) 조회)
-  const companyNameMap = new Map(companies.map((c) => [c.company.id, c.company.name]));
+  const companyNameMap = new Map(companies.map((c) => [c.corpCode, c.corpName]));
   // 빠른 종목코드 조회를 위한 Map 생성 (O(1) 조회)
-  const stockCodeMap = new Map(companies.map((c) => [c.company.id, c.company.stockCode]));
+  const stockCodeMap = new Map(companies.map((c) => [c.corpCode, c.stockCode]));
 
   const BATCH_SIZE = 50;
   const success: FinancialMetrics[] = [];
