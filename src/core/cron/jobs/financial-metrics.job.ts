@@ -6,7 +6,7 @@ const ENV_KEY = "ENABLE_FINANCIAL_METRICS_CRON";
 
 export const financialMetricsJob = {
   name: "financial-metrics",
-  schedule: "5 * * * *", // 매시간 5분에 실행
+  schedule: "15 * * * *", // 매시간 15분에 실행
 
   handler: async () => {
     // 0. 환경 변수로 실행 여부 확인

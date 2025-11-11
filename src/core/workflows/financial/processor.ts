@@ -8,9 +8,9 @@ import { CompanyInfo } from "./types";
 
 /**
  * 배치 크기 상수
- * 메모리 사용량 최적화를 위해 10개로 설정 (Render 512MB 제한 고려)
+ * API 효율성과 메모리 사용량의 균형을 고려하여 50개로 설정
  */
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 50;
 
 /**
  * 재무 지표 배치 처리 결과
