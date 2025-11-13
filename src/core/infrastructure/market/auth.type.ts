@@ -12,3 +12,22 @@ export interface KisRevokeResponse {
   code: number;
   message: string;
 }
+
+/**
+ * KIS 토큰 타입
+ * - access: REST API용 토큰
+ * - approval: WebSocket용 토큰
+ */
+export type KisTokenType = "access" | "approval";
+
+/**
+ * DB에 저장된 KIS 토큰 레코드
+ */
+export interface KisTokenRecord {
+  id: string;
+  type: KisTokenType;
+  token: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}

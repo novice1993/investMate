@@ -6,7 +6,7 @@ export async function register() {
     console.log("Starting application initialization in Node.js runtime...");
 
     try {
-      // await initializeKisToken();
+      await initializeKisToken();
       await initializeGemini();
       await initializeSupabase();
       console.log("Application initialization finished successfully.");
@@ -23,18 +23,5 @@ export async function register() {
       console.error("⚠️ [CRITICAL] Cron initialization failed:", error);
       console.error("Server will continue, but scheduled tasks won't run.");
     }
-
-    // Register graceful shutdown hooks
-    // process.on("SIGTERM", async () => {
-    //   console.log("Received SIGTERM signal. Cleaning up...");
-    //   await cleanupApplication();
-    //   process.exit(0);
-    // });
-
-    // process.on("SIGINT", async () => {
-    //   console.log("Received SIGINT signal. Cleaning up...");
-    //   await cleanupApplication();
-    //   process.exit(0);
-    // });
   }
 }
