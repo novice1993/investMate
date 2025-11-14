@@ -6,7 +6,7 @@ const ENV_KEY = "ENABLE_NEWS_COLLECTION_CRON";
 
 export const newsCollectionJob = {
   name: "news-collection",
-  schedule: "*/10 * * * *", // 10분마다 실행
+  schedule: "30 * * * *", // 매 시간 30분에 실행
 
   handler: async () => {
     // 0. 환경 변수로 실행 여부 확인 (로컬에서 Render와 중복 방지)

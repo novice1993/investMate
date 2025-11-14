@@ -4,14 +4,15 @@
  */
 
 import { NewsArticle } from "@/core/entities/news.entity";
-import { checkArticleExists, insertNewsArticles } from "@/core/infrastructure/news/repository.infra";
+import { checkArticlesExistBatch, insertNewsArticles } from "@/core/infrastructure/news/repository.infra";
 import { fetchMKSitemap } from "@/core/infrastructure/news/sitemap.infra";
+import { getLastRunTime, updateLastRunTime, filterArticlesSinceLastRun } from "@/core/services/news-execution-tracker.service";
 import { parseMKSitemap } from "@/core/services/news-parser.service";
+import { scrapeArticle } from "@/core/services/news-scraper.service";
 import { createRPMState, splitIntoGroups, processGroupsWithRPMLimit } from "./rpm";
 import { NewsCollectionResult } from "./types";
 
 const MK_SITEMAP_URL = "https://www.mk.co.kr/sitemap/latest-articles";
-const ALLOWED_SECTIONS = ["economy", "business", "realestate", "stock", "it", "politics"];
 const MAX_CONCURRENT_REQUESTS = 5;
 
 // ============================================================================
@@ -22,36 +23,45 @@ const MAX_CONCURRENT_REQUESTS = 5;
  * 뉴스 수집 워크플로우 실행
  *
  * 프로세스:
- * 1. 매경 sitemap에서 최신 기사 목록 조회
- * 2. 중복 체크 (직렬 처리)
- * 3. 이미 존재하는 기사 발견 시 중단 (이후 기사는 모두 처리됨)
- * 4. 새 기사는 병렬로 스크래핑 + AI 개별 요약 (각 기사마다 독립적 처리)
- * 5. 성공한 기사만 DB에 저장
+ * 1. 매경 sitemap에서 최신 기사 목록 조회 및 시간 기반 필터링
+ * 2. 배치 중복 체크 (1회 쿼리)
+ * 3. 스크래핑 (전체 병렬 처리, paper_date 체크)
+ * 4. AI 요약 (신문 기사만 5개씩 그룹 + RPM 제한)
+ * 5. 성공한 기사만 DB에 저장 후 마지막 실행 시간 업데이트
  */
 export async function runNewsCollectionWorkflow(): Promise<NewsCollectionResult> {
   console.log("[Workflow] 뉴스 수집 시작");
 
   try {
-    // 1. Sitemap 조회 및 파싱
+    // 1. Sitemap 조회, 파싱 및 시간 기반 필터링
     const newsList = await fetchAndParseSitemap();
 
     if (newsList.length === 0) {
       return createSuccessResult(0, 0, []);
     }
 
-    // 2. 중복 체크 (직렬 처리)
+    // 2. 배치 중복 체크
     const { itemsToProcess, skippedCount } = await filterDuplicateArticles(newsList);
 
     if (itemsToProcess.length === 0) {
       return createSuccessResult(0, skippedCount, []);
     }
 
-    // 3. 개별 처리 (스크래핑 병렬 + AI 개별 요약)
-    const { processedArticles, errors } = await processArticles(itemsToProcess);
+    // 3. 스크래핑 (전체 병렬 처리)
+    const validArticles = await scrapeArticles(itemsToProcess);
 
-    // 4. DB 배치 저장
+    if (validArticles.length === 0) {
+      console.log("[Workflow] 신문 기사 없음 (모두 웹 전용)");
+      return createSuccessResult(0, skippedCount, []);
+    }
+
+    // 4. AI 요약 (5개씩 그룹 + RPM 제한)
+    const { processedArticles, errors } = await summarizeArticles(validArticles);
+
+    // 5. DB 배치 저장 및 성공 시 마지막 실행 시간 업데이트
     if (processedArticles.length > 0) {
       await saveArticlesToDatabase(processedArticles);
+      updateLastRunTime();
     }
 
     const result = createSuccessResult(processedArticles.length, skippedCount, errors);
@@ -68,34 +78,35 @@ export async function runNewsCollectionWorkflow(): Promise<NewsCollectionResult>
 // ============================================================================
 
 /**
- * 1단계: Sitemap 조회 및 파싱
+ * 1단계: Sitemap 조회, 파싱 및 시간 기반 필터링
  */
 async function fetchAndParseSitemap(): Promise<NewsArticle[]> {
   console.log("[Workflow] Sitemap 조회 중...");
   const xmlData = await fetchMKSitemap(MK_SITEMAP_URL);
-  const newsList = parseMKSitemap(xmlData, ALLOWED_SECTIONS);
-  console.log(`[Workflow] ${newsList.length}개 기사 발견`);
+  const allArticles = parseMKSitemap(xmlData);
 
-  // TODO: 테스트용 - 필요시 주석 해제하여 사용
-  // const newsListToProcess = newsList.slice(0, 5);
-  // console.log(`[Workflow] [테스트] ${newsListToProcess.length}개만 처리합니다.`);
-  // return newsListToProcess;
-  return newsList;
+  // 마지막 실행 시간 이후 기사만 필터링
+  const lastRunTime = getLastRunTime();
+  const filteredArticles = filterArticlesSinceLastRun(allArticles, lastRunTime);
+
+  console.log(`[Workflow] ${filteredArticles.length}개 기사 발견 (전체 ${allArticles.length}개 중)`);
+  return filteredArticles;
 }
 
 /**
- * 2단계: 중복 체크 (직렬 처리)
+ * 2단계: 중복 체크 (배치 처리)
  */
 async function filterDuplicateArticles(newsList: NewsArticle[]): Promise<{ itemsToProcess: NewsArticle[]; skippedCount: number }> {
-  const itemsToProcess: NewsArticle[] = [];
-
-  for (const newsItem of newsList) {
-    if (await checkArticleExists(newsItem.url)) {
-      console.log(`[Workflow] 기존 기사 발견, 중단: ${newsItem.url}`);
-      break;
-    }
-    itemsToProcess.push(newsItem);
+  if (newsList.length === 0) {
+    return { itemsToProcess: [], skippedCount: 0 };
   }
+
+  // 배치로 중복 체크 (1회 쿼리)
+  const urls = newsList.map((item) => item.url);
+  const existingUrls = await checkArticlesExistBatch(urls);
+
+  // 중복되지 않은 기사만 필터링
+  const itemsToProcess = newsList.filter((item) => !existingUrls.has(item.url));
 
   const skippedCount = newsList.length - itemsToProcess.length;
   console.log(`[Workflow] 중복 체크 완료: ${itemsToProcess.length}개 처리 예정, ${skippedCount}개 스킵`);
@@ -104,24 +115,61 @@ async function filterDuplicateArticles(newsList: NewsArticle[]): Promise<{ items
 }
 
 /**
- * 3단계: 개별 처리 (스크래핑 병렬 + AI 개별 요약)
- * RPM 제한을 고려하여 5개씩 그룹으로 나눠 처리
+ * 3단계: 스크래핑 (전체 병렬 처리, RPM 제한 없음)
  */
-async function processArticles(itemsToProcess: NewsArticle[]): Promise<{ processedArticles: NewsArticle[]; errors: Array<{ url: string; error: string }> }> {
-  console.log(`[Workflow] ${itemsToProcess.length}개 기사 개별 처리 시작`);
+async function scrapeArticles(itemsToProcess: NewsArticle[]): Promise<NewsArticle[]> {
+  console.log(`[Workflow] ${itemsToProcess.length}개 기사 스크래핑 시작`);
 
-  const groups = splitIntoGroups(itemsToProcess, MAX_CONCURRENT_REQUESTS);
+  const scrapingResults = await Promise.allSettled(itemsToProcess.map((item) => scrapeArticle(item.url)));
+
+  const validArticles: NewsArticle[] = [];
+
+  scrapingResults.forEach((result, idx) => {
+    const newsItem = itemsToProcess[idx];
+
+    if (result.status === "rejected") {
+      console.warn(`[Workflow] ✗ ${newsItem.title} - 스크래핑 실패: ${result.reason instanceof Error ? result.reason.message : "알 수 없는 오류"}`);
+      return;
+    }
+
+    if (result.value === null) {
+      console.log(`[Workflow] ○ ${newsItem.title} - 웹 전용 기사 스킵`);
+      return;
+    }
+
+    // paper_date를 포함한 NewsArticle 생성
+    validArticles.push({
+      ...newsItem,
+      paper_date: result.value.paper_date,
+    });
+  });
+
+  console.log(`[Workflow] 스크래핑 완료: ${validArticles.length}개 신문 기사 발견`);
+  return validArticles;
+}
+
+/**
+ * 4단계: AI 요약 (5개씩 그룹 + RPM 제한)
+ */
+async function summarizeArticles(validArticles: NewsArticle[]): Promise<{ processedArticles: NewsArticle[]; errors: Array<{ url: string; error: string }> }> {
+  if (validArticles.length === 0) {
+    return { processedArticles: [], errors: [] };
+  }
+
+  console.log(`[Workflow] ${validArticles.length}개 신문 기사 AI 요약 시작`);
+
+  const groups = splitIntoGroups(validArticles, MAX_CONCURRENT_REQUESTS);
   const rpmState = createRPMState();
 
   const allResults = await processGroupsWithRPMLimit(groups, rpmState);
 
-  console.log(`[Workflow] 처리 완료: 성공 ${allResults.processedArticles.length}개, 실패 ${allResults.errors.length}개`);
+  console.log(`[Workflow] AI 요약 완료: 성공 ${allResults.processedArticles.length}개, 실패 ${allResults.errors.length}개`);
 
   return allResults;
 }
 
 /**
- * 4단계: DB 배치 저장
+ * 5단계: DB 배치 저장
  */
 async function saveArticlesToDatabase(articles: NewsArticle[]): Promise<void> {
   console.log(`[Workflow] ${articles.length}개 기사 DB 저장 중...`);
