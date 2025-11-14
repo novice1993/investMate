@@ -52,7 +52,7 @@ export function getGeminiClient(): GoogleGenAI {
 /**
  * 기본 LLM 모델
  */
-export const DEFAULT_LLM_MODEL = "gemini-2.0-flash-exp";
+export const DEFAULT_LLM_MODEL = "gemini-2.5-flash-lite";
 
 /**
  * Generates text using the configured LLM.

@@ -1,23 +1,22 @@
 import { initializeGeminiClient } from "@/core/infrastructure/common/llm.infra";
 import { initializeSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
-import { issueKisToken, revokeKisToken } from "@/core/infrastructure/market/kis-auth.infra";
-import { getCached, setCache, clearCache } from "@/shared/lib/utils/cache";
+import { getOrRefreshKisToken } from "@/core/infrastructure/market/kis-auth.infra";
+import { setCache, clearCache } from "@/shared/lib/utils/cache";
 
 const KIS_TOKEN_KEY = "kis-auth-token";
 
 /**
- * KIS 인증 토큰을 발급받아 메모리에 저장하는 초기화 함수
+ * KIS 인증 토큰을 초기화하는 함수
+ *
+ * DB에서 유효한 토큰을 가져오거나 새로 발급받아 메모리에 캐시합니다.
  */
 export async function initializeKisToken() {
   try {
-    const tokenResponse = await issueKisToken();
-    if (tokenResponse && tokenResponse.access_token) {
-      setCache(KIS_TOKEN_KEY, tokenResponse.access_token);
-    } else {
-      throw new Error("Invalid response from KIS token API.");
-    }
+    const token = await getOrRefreshKisToken("access");
+    setCache(KIS_TOKEN_KEY, token);
+    console.log("[KIS Token Init] 토큰 초기화 완료");
   } catch (error) {
-    console.error("Error during KIS token initialization:", error);
+    console.error("[KIS Token Init] 초기화 실패:", error);
     throw error;
   }
 }
@@ -48,20 +47,16 @@ export async function initializeSupabase() {
 
 /**
  * 애플리케이션 종료 시 실행될 정리 작업을 수행합니다.
+ *
+ * Note: KIS 토큰은 DB에 영속 저장되어 서버 재시작 후 재사용됩니다.
+ * 따라서 서버 종료 시 자동 폐기하지 않습니다.
+ * 긴급 상황 시 revokeKisToken()을 수동으로 호출하세요.
  */
 export async function cleanupApplication() {
   console.log("Graceful shutdown initiated. Cleaning up resources...");
-  const currentToken = getCached<string>(KIS_TOKEN_KEY);
-  if (currentToken) {
-    try {
-      await revokeKisToken(currentToken);
-      console.log("KIS auth token has been successfully revoked from the KIS server.");
-    } catch (error) {
-      console.error("Error during KIS token revocation:", error);
-    }
-  }
 
-  // 내부 메모리(클로저 변수)에 저장된 토큰을 정리합니다.
+  // 메모리 캐시만 정리 (토큰은 DB에 유지)
   clearCache(KIS_TOKEN_KEY);
+
   console.log("Cleanup finished.");
 }
