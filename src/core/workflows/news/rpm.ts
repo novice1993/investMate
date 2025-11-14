@@ -9,7 +9,7 @@ import { RPMState, ProcessingResults } from "./types";
 
 // RPM 제한 설정
 const MAX_CONCURRENT_REQUESTS = 5; // 한 번에 최대 5개씩 병렬 처리
-const RPM_LIMIT = 15; // Gemini 2.5 Flash-Lite RPM 제한
+const RPM_LIMIT = 10; // Gemini 2.5 Flash-Lite RPM 제한 (보수적 설정)
 const SAFE_WINDOW_MS = 80000; // 60초 + 20초 안전 여유
 
 // ============================================================================
