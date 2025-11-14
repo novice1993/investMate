@@ -6,8 +6,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
  * 안정적인 싱글톤(Singleton) 캐시를 구현합니다.
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // 1. globalThis에 캐시 객체의 타입을 선언해줍니다.
 declare global {
@@ -26,13 +26,13 @@ export function initializeSupabaseClient(): void {
     return;
   }
 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be provided in environment variables.");
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be provided in environment variables.");
   }
 
   try {
-    globalThis.supabaseClientCache = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("[Supabase Infra] Supabase client initialized successfully.");
+    globalThis.supabaseClientCache = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    console.log("[Supabase Infra] Supabase client initialized successfully (Service Role).");
   } catch (error) {
     console.error("[Supabase Infra] Failed to initialize Supabase client:", error);
     throw error;
