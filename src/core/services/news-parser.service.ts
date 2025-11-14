@@ -13,7 +13,7 @@ import { MkSitemap, MkSitemapUrl } from "@/core/infrastructure/news/news.type";
 /**
  * 매경 사이트맵 XML을 NewsArticle 배열로 변환하는 함수
  */
-export function parseMKSitemap(xmlData: string, allowedSections: string[]): NewsArticle[] {
+export function parseMKSitemap(xmlData: string): NewsArticle[] {
   const parser = new XMLParser();
   const jsonObj: MkSitemap = parser.parse(xmlData);
 
@@ -22,9 +22,8 @@ export function parseMKSitemap(xmlData: string, allowedSections: string[]): News
   }
 
   const allUrls: MkSitemapUrl[] = jsonObj.urlset.url;
-  const filteredUrls = filterMkSitemapUrlsBySection(allUrls, allowedSections);
 
-  return filteredUrls.map(transformSitemapUrlToNewsArticle);
+  return allUrls.map(transformSitemapUrlToNewsArticle);
 }
 
 /**
@@ -49,27 +48,6 @@ export function extractSectionFromUrl(url: string): string {
 // ============================================================================
 // Private Helpers
 // ============================================================================
-
-/**
- * URL에서 섹션을 추출하여 허용된 섹션의 기사만 필터링하는 함수
- */
-function filterMkSitemapUrlsBySection(urls: MkSitemapUrl[], allowedSections: string[]): MkSitemapUrl[] {
-  return urls.filter((url) => {
-    try {
-      const urlPath = new URL(url.loc).pathname; // ex: /news/stock/11430262
-      const pathSegments = urlPath.split("/").filter(Boolean); // ex: ["news", "stock", "11430262"]
-
-      if (pathSegments.length > 1 && pathSegments[0] === "news") {
-        const section = pathSegments[1];
-        return allowedSections.includes(section);
-      }
-      return false;
-    } catch (error) {
-      console.error(`Invalid URL found: ${url.loc}`, error);
-      return false;
-    }
-  });
-}
 
 /**
  * MkSitemapUrl을 NewsArticle로 변환하는 함수

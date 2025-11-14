@@ -10,5 +10,6 @@ export interface NewsArticle {
   section: string;
   source: string;
   published_at: string; // ISO 8601 format
+  paper_date?: string; // 신문 게재일 (YYYY-MM-DD 형식)
   created_at?: string;
 }

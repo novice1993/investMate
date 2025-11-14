@@ -47,6 +47,38 @@ export async function checkArticleExists(url: string): Promise<boolean> {
 }
 
 /**
+ * 여러 URL에 대해 이미 존재하는 기사를 배치로 확인합니다.
+ * 큰 배치는 50개씩 나눠서 처리합니다.
+ * @param urls 확인할 URL 배열
+ * @returns 이미 존재하는 URL들의 Set
+ */
+export async function checkArticlesExistBatch(urls: string[]): Promise<Set<string>> {
+  if (urls.length === 0) {
+    return new Set();
+  }
+
+  const BATCH_SIZE = 50;
+  const existingUrls = new Set<string>();
+
+  // 50개씩 나눠서 처리
+  for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+    const batch = urls.slice(i, i + BATCH_SIZE);
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.from("news_articles").select("url").in("url", batch);
+
+    if (error) {
+      console.error("[News Repository] 배치 중복 체크 오류:", error);
+      throw error;
+    }
+
+    data?.forEach((item) => existingUrls.add(item.url));
+  }
+
+  console.log(`[News Repository] 배치 중복 체크 완료: ${urls.length}개 URL, ${existingUrls.size}개 중복 발견`);
+  return existingUrls;
+}
+
+/**
  * 모든 뉴스 기사를 조회합니다.
  */
 export async function fetchNewsArticles(limit: number = 100, section?: string) {

@@ -1,4 +1,5 @@
 import { initializeKisToken, initializeGemini, initializeSupabase } from "@/core/services/initialization.service";
+import { initializeLastRunTime } from "./core/services/news-execution-tracker.service";
 
 export async function register() {
   // This check ensures this code runs only in the Node.js runtime, not on the Edge.
@@ -9,6 +10,7 @@ export async function register() {
       await initializeSupabase();
       await initializeGemini();
       await initializeKisToken();
+      initializeLastRunTime(); // 뉴스 수집 마지막 실행 시간 초기화
       console.log("Application initialization finished successfully.");
     } catch (error) {
       console.error("Critical error during application initialization. Server might be in an unstable state.", error instanceof Error ? error.message : error);
