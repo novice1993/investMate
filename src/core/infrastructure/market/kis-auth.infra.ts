@@ -118,9 +118,9 @@ async function issueAndSaveNewToken(type: KisTokenType): Promise<string> {
     throw new Error("Invalid response from KIS token API.");
   }
 
-  // 만료 시간 계산 (24시간 후)
+  // 만료 시간 계산 (6시간 후)
   const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 24);
+  expiresAt.setHours(expiresAt.getHours() + 6);
 
   // DB에 저장
   await saveKisTokenToDB(type, tokenResponse.access_token, expiresAt);
