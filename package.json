@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build:styles": "node src/styles/scripts/build-tokens.js",
-    "dev": "npm run build:styles && next dev --turbopack",
+    "dev": "npm run build:styles && node server.js",
     "build": "npm run build:styles && next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "prepare": "husky",
     "test": "vitest",
@@ -42,6 +42,9 @@
     "react-dom": "19.1.0",
     "rss-parser": "^3.13.0",
     "sax": "^1.4.3",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.3",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
@@ -58,6 +61,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sax": "^1.2.7",
+    "@types/ws": "^8.18.1",
     "@types/xml2js": "^0.4.14",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
