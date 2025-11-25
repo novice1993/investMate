@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
 import { jsonHttpClient } from "@/shared/lib/http";
-import { KisTokenResponse, KisRevokeResponse, KisTokenType, KisTokenRecord } from "./auth.type";
+import { KisTokenResponse, KisRevokeResponse, KisApprovalResponse, KisTokenType, KisTokenRecord } from "./auth.type";
 
 const KIS_BASE_URL = process.env.KIS_BASE_URL;
 const APP_KEY = process.env.KIS_APP_KEY;
@@ -39,6 +39,30 @@ export const revokeKisToken = async (token: string) => {
   };
 
   return jsonHttpClient.post<KisRevokeResponse, typeof body>(`${KIS_BASE_URL}/oauth2/revokeP`, body);
+};
+
+/**
+ * @description 한국투자증권 WebSocket 접속키(Approval Key) 발급
+ * @returns 286자 길이의 approval_key
+ */
+export const issueApprovalKey = async (): Promise<string> => {
+  if (!KIS_BASE_URL || !APP_KEY || !APP_SECRET) {
+    throw new Error("KIS 관련 환경변수(URL, APP_KEY, APP_SECRET)가 설정되지 않았습니다.");
+  }
+
+  const body = {
+    grant_type: "client_credentials",
+    appkey: APP_KEY,
+    secretkey: APP_SECRET,
+  };
+
+  const response = await jsonHttpClient.post<KisApprovalResponse, typeof body>(`${KIS_BASE_URL}/oauth2/Approval`, body);
+
+  if (!response || !response.approval_key) {
+    throw new Error("Invalid response from KIS approval API.");
+  }
+
+  return response.approval_key;
 };
 
 /**
@@ -105,12 +129,11 @@ function isTokenValid(token: KisTokenRecord | null): boolean {
 }
 
 /**
- * @description KIS API에서 새 토큰 발급 후 DB에 저장
- * @param type 토큰 타입
- * @returns 발급된 토큰 문자열
+ * @description KIS API에서 새 Access Token 발급 후 DB에 저장
+ * @returns 발급된 Access Token
  */
-async function issueAndSaveNewToken(type: KisTokenType): Promise<string> {
-  console.log(`[KIS Auth] 새 토큰 발급 중 (type: ${type})...`);
+async function issueAndSaveNewAccessToken(): Promise<string> {
+  console.log("[KIS Auth] 새 Access Token 발급 중...");
 
   const tokenResponse = await issueKisToken();
 
@@ -118,39 +141,83 @@ async function issueAndSaveNewToken(type: KisTokenType): Promise<string> {
     throw new Error("Invalid response from KIS token API.");
   }
 
-  // 만료 시간 계산 (24시간 후)
+  // 만료 시간 계산 (6시간 후)
   const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 24);
+  expiresAt.setHours(expiresAt.getHours() + 6);
 
   // DB에 저장
-  await saveKisTokenToDB(type, tokenResponse.access_token, expiresAt);
+  await saveKisTokenToDB("access", tokenResponse.access_token, expiresAt);
 
-  console.log(`[KIS Auth] 새 토큰 발급 완료 (expires: ${expiresAt.toISOString()})`);
+  console.log(`[KIS Auth] Access Token 발급 완료 (expires: ${expiresAt.toISOString()})`);
 
   return tokenResponse.access_token;
 }
 
 /**
- * @description DB에서 유효한 토큰을 가져오거나, 없으면 새로 발급
+ * @description KIS API에서 새 Approval Key 발급 후 DB에 저장
+ * @returns 발급된 Approval Key
+ */
+async function issueAndSaveNewApprovalKey(): Promise<string> {
+  console.log("[KIS Auth] 새 Approval Key 발급 중...");
+
+  const approvalKey = await issueApprovalKey();
+
+  // Approval Key는 24시간 유효
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 24);
+
+  // DB에 저장
+  await saveKisTokenToDB("approval", approvalKey, expiresAt);
+
+  console.log(`[KIS Auth] Approval Key 발급 완료 (expires: ${expiresAt.toISOString()})`);
+
+  return approvalKey;
+}
+
+/**
+ * @description DB에서 유효한 Access Token을 가져오거나, 없으면 새로 발급
  *
  * 동작 순서:
  * 1. DB에서 토큰 조회
  * 2. 유효하면 반환
  * 3. 없거나 만료되었으면 새로 발급 후 저장
  *
- * @param type 토큰 타입 ('access' 또는 'approval')
- * @returns 유효한 토큰 문자열
+ * @returns 유효한 Access Token
  */
-export async function getOrRefreshKisToken(type: KisTokenType): Promise<string> {
+export async function getOrRefreshKisToken(): Promise<string> {
   // 1. DB에서 기존 토큰 조회
-  const dbToken = await getKisTokenFromDB(type);
+  const dbToken = await getKisTokenFromDB("access");
 
   // 2. 유효성 확인
   if (isTokenValid(dbToken)) {
-    console.log(`[KIS Auth] 기존 토큰 사용 (type: ${type}, 만료: ${dbToken!.expires_at})`);
+    console.log(`[KIS Auth] 기존 Access Token 사용 (만료: ${dbToken!.expires_at})`);
     return dbToken!.token;
   }
 
   // 3. 없거나 만료됨 → 새로 발급
-  return await issueAndSaveNewToken(type);
+  return await issueAndSaveNewAccessToken();
+}
+
+/**
+ * @description DB에서 유효한 Approval Key를 가져오거나, 없으면 새로 발급
+ *
+ * 동작 순서:
+ * 1. DB에서 Approval Key 조회
+ * 2. 유효하면 반환
+ * 3. 없거나 만료되었으면 새로 발급 후 저장
+ *
+ * @returns 유효한 Approval Key (WebSocket 인증용)
+ */
+export async function getOrRefreshApprovalKey(): Promise<string> {
+  // 1. DB에서 기존 Approval Key 조회
+  const dbToken = await getKisTokenFromDB("approval");
+
+  // 2. 유효성 확인
+  if (isTokenValid(dbToken)) {
+    console.log(`[KIS Auth] 기존 Approval Key 사용 (만료: ${dbToken!.expires_at})`);
+    return dbToken!.token;
+  }
+
+  // 3. 없거나 만료됨 → 새로 발급
+  return await issueAndSaveNewApprovalKey();
 }

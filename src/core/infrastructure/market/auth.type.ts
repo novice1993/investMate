@@ -14,6 +14,15 @@ export interface KisRevokeResponse {
 }
 
 /**
+ * KIS Approval Key 응답 타입 (WebSocket 인증용)
+ */
+export interface KisApprovalResponse {
+  approval_key: string;
+  error_code?: string;
+  error_message?: string;
+}
+
+/**
  * KIS 토큰 타입
  * - access: REST API용 토큰
  * - approval: WebSocket용 토큰

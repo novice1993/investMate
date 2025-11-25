@@ -1,22 +1,39 @@
 import { initializeGeminiClient } from "@/core/infrastructure/common/llm.infra";
 import { initializeSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
-import { getOrRefreshKisToken } from "@/core/infrastructure/market/kis-auth.infra";
+import { getOrRefreshKisToken, getOrRefreshApprovalKey } from "@/core/infrastructure/market/kis-auth.infra";
 import { setCache, clearCache } from "@/shared/lib/utils/cache";
 
 const KIS_TOKEN_KEY = "kis-auth-token";
+const KIS_APPROVAL_KEY = "kis-approval-key";
 
 /**
- * KIS 인증 토큰을 초기화하는 함수
+ * KIS REST API용 Access Token을 초기화하는 함수
  *
  * DB에서 유효한 토큰을 가져오거나 새로 발급받아 메모리에 캐시합니다.
  */
-export async function initializeKisToken() {
+export async function initializeKisAccessToken() {
   try {
-    const token = await getOrRefreshKisToken("access");
+    const token = await getOrRefreshKisToken();
     setCache(KIS_TOKEN_KEY, token);
-    console.log("[KIS Token Init] 토큰 초기화 완료");
+    console.log("[KIS Access Token Init] 토큰 초기화 완료");
   } catch (error) {
-    console.error("[KIS Token Init] 초기화 실패:", error);
+    console.error("[KIS Access Token Init] 초기화 실패:", error);
+    throw error;
+  }
+}
+
+/**
+ * KIS WebSocket 인증용 Approval Key를 초기화하는 함수
+ *
+ * DB에서 유효한 Approval Key를 가져오거나 새로 발급받아 메모리에 캐시합니다.
+ */
+export async function initializeKisApprovalKey() {
+  try {
+    const approvalKey = await getOrRefreshApprovalKey();
+    setCache(KIS_APPROVAL_KEY, approvalKey);
+    console.log("[KIS Approval Key Init] Approval Key 초기화 완료");
+  } catch (error) {
+    console.error("[KIS Approval Key Init] 초기화 실패:", error);
     throw error;
   }
 }
@@ -57,6 +74,7 @@ export async function cleanupApplication() {
 
   // 메모리 캐시만 정리 (토큰은 DB에 유지)
   clearCache(KIS_TOKEN_KEY);
+  clearCache(KIS_APPROVAL_KEY);
 
   console.log("Cleanup finished.");
 }
