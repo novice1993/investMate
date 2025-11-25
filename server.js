@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
+import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -11,7 +12,19 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+// KIS WebSocket 클라이언트 생성
+const kisClient = new KisWebSocketClient();
+
+app.prepare().then(async () => {
+  // KIS WebSocket 연결
+  try {
+    console.log("[Server] KIS WebSocket 연결 시도...");
+    await kisClient.connect();
+    console.log("[Server] ✅ KIS WebSocket 연결 완료");
+  } catch (error) {
+    console.error("[Server] ❌ KIS WebSocket 연결 실패:", error);
+    console.error("[Server] ⚠️  실시간 시세 기능이 비활성화됩니다.");
+  }
   // HTTP Server 생성
   const server = createServer(async (req, res) => {
     try {
@@ -32,24 +45,42 @@ app.prepare().then(() => {
     },
   });
 
+  // KIS WebSocket 데이터 수신 → Socket.io로 브로드캐스트
+  kisClient.onDataReceived = (data) => {
+    // 실시간 데이터를 해당 종목을 구독 중인 클라이언트들에게 전송
+    if (data.stockCode) {
+      io.to(`stock:${data.stockCode}`).emit("price-update", data);
+    }
+  };
+
   // Socket.io 이벤트 핸들러
   io.on("connection", (socket) => {
-    console.log("[Socket.io] 클라이언트 연결:", socket.id);
+    if (dev) console.log("[Socket.io] 클라이언트 연결:", socket.id);
 
-    // TODO: 종목 구독 이벤트 (다음 단계에서 구현)
+    // 프론트엔드 구독 요청 → KIS에 구독 전달
     socket.on("subscribe", ({ stockCode }) => {
-      console.log(`[Socket.io] ${stockCode} 구독 요청`);
+      if (dev) console.log(`[Socket.io] ${stockCode} 구독 요청`);
+
+      // Socket.io Room 참여
       socket.join(`stock:${stockCode}`);
+
+      // KIS WebSocket에 구독 요청
+      kisClient.subscribe(stockCode);
     });
 
-    // TODO: 구독 해제 이벤트
+    // 프론트엔드 구독 해제 → KIS에 구독 해제 전달
     socket.on("unsubscribe", ({ stockCode }) => {
-      console.log(`[Socket.io] ${stockCode} 구독 해제`);
+      if (dev) console.log(`[Socket.io] ${stockCode} 구독 해제`);
+
+      // Socket.io Room 나가기
       socket.leave(`stock:${stockCode}`);
+
+      // KIS WebSocket에 구독 해제 요청
+      kisClient.unsubscribe(stockCode);
     });
 
     socket.on("disconnect", () => {
-      console.log("[Socket.io] 클라이언트 연결 해제:", socket.id);
+      if (dev) console.log("[Socket.io] 클라이언트 연결 해제:", socket.id);
     });
   });
 

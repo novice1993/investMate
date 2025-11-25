@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build:styles": "node src/styles/scripts/build-tokens.js",
-    "dev": "npm run build:styles && node server.js",
+    "dev": "npm run build:styles && tsx server.js",
     "build": "npm run build:styles && next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "NODE_ENV=production tsx server.js",
     "lint": "next lint",
     "prepare": "husky",
     "test": "vitest",
@@ -30,6 +30,7 @@
     "@supabase/supabase-js": "^2.75.0",
     "@tanstack/react-virtual": "^3.13.12",
     "adm-zip": "^0.5.16",
+    "bufferutil": "^4.0.9",
     "cheerio": "^1.1.2",
     "date-fns": "^4.1.0",
     "fast-xml-parser": "^5.2.5",
@@ -44,6 +45,7 @@
     "sax": "^1.4.3",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
+    "utf-8-validate": "^6.0.5",
     "ws": "^8.18.3",
     "xml2js": "^0.6.2"
   },
