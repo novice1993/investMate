@@ -1,17 +1,38 @@
 import WebSocket from "ws";
+import { RealtimePrice, ChangeSign } from "@/core/entities/stock-price.entity";
 import { getCached } from "@/shared/lib/utils/cache";
 
 const KIS_WS_URL = "ws://ops.koreainvestment.com:21000";
 const KIS_APPROVAL_KEY = "kis-approval-key";
 
 /**
- * KIS 실시간 시세 데이터
+ * KIS H0STCNT0 응답 필드 인덱스
+ * @see https://apiportal.koreainvestment.com (실시간 국내주식 체결가)
  */
-export interface KisRealtimeData {
-  raw: string; // 원본 메시지
-  stockCode?: string; // 종목코드 (파싱 후)
-  price?: number; // 현재가 (파싱 후)
-  timestamp?: string; // 시간 (파싱 후)
+const KIS_FIELD_INDEX = {
+  STOCK_CODE: 0, // 유가증권 단축 종목코드
+  TIME: 1, // 주식 체결 시간 (HHMMSS)
+  PRICE: 2, // 주식 현재가
+  SIGN: 3, // 전일 대비 부호 (1:상한, 2:상승, 3:보합, 4:하한, 5:하락)
+  CHANGE: 4, // 전일 대비
+  VOLUME: 13, // 누적 거래량
+  DATE: 33, // 영업일자 (YYYYMMDD)
+} as const;
+
+/**
+ * KIS 전일대비 부호 → ChangeSign 변환
+ */
+function parseChangeSign(sign: string): ChangeSign {
+  switch (sign) {
+    case "1": // 상한
+    case "2": // 상승
+      return "rise";
+    case "4": // 하한
+    case "5": // 하락
+      return "fall";
+    default: // 3: 보합
+      return "flat";
+  }
 }
 
 /**
@@ -92,15 +113,64 @@ export class KisWebSocketClient {
   }
 
   /**
-   * KIS 메시지 파싱 (간단한 버전)
+   * KIS 메시지 파싱
+   * 실시간 데이터는 '0'으로 시작하고 '|'로 구분됨
+   * 형식: 0|H0STCNT0|개수|데이터(^로 구분)
    */
-  private parseMessage(message: string): KisRealtimeData | null {
+  private parseMessage(message: string): RealtimePrice | null {
     if (!message || message.trim().length === 0) {
       return null;
     }
 
-    // 일단 원본 메시지를 그대로 반환 (나중에 파싱 로직 추가)
-    return { raw: message };
+    // 실시간 데이터가 아니면 무시 (응답 메시지 등)
+    if (message[0] !== "0") {
+      return null;
+    }
+
+    try {
+      const parts = message.split("|");
+      if (parts.length < 4) {
+        return null;
+      }
+
+      const trId = parts[1];
+      // H0STCNT0 (실시간 체결가)만 처리
+      if (trId !== "H0STCNT0") {
+        return null;
+      }
+
+      // 실제 데이터는 parts[3]에 있고, '^'로 구분됨
+      const dataStr = parts[3];
+      const fields = dataStr.split("^");
+
+      const stockCode = fields[KIS_FIELD_INDEX.STOCK_CODE];
+      const time = fields[KIS_FIELD_INDEX.TIME];
+      const date = fields[KIS_FIELD_INDEX.DATE];
+      const price = parseInt(fields[KIS_FIELD_INDEX.PRICE], 10);
+      const change = parseInt(fields[KIS_FIELD_INDEX.CHANGE], 10);
+      const sign = fields[KIS_FIELD_INDEX.SIGN];
+      const volume = parseInt(fields[KIS_FIELD_INDEX.VOLUME], 10);
+
+      // 등락률 계산: (전일대비 / 전일종가) * 100
+      const prevPrice = price - change;
+      const changeRate = prevPrice !== 0 ? (change / prevPrice) * 100 : 0;
+
+      // timestamp: YYYYMMDD + HHMMSS → ISO 형식
+      const timestamp = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T${time.slice(0, 2)}:${time.slice(2, 4)}:${time.slice(4, 6)}+09:00`;
+
+      return {
+        stockCode,
+        timestamp,
+        price,
+        change,
+        changeRate: Math.round(changeRate * 100) / 100, // 소수점 2자리
+        changeSign: parseChangeSign(sign),
+        volume,
+      };
+    } catch (error) {
+      console.error("[KIS WS] 파싱 에러:", error);
+      return null;
+    }
   }
 
   /**
@@ -164,7 +234,7 @@ export class KisWebSocketClient {
    * 실시간 데이터 수신 시 호출될 콜백
    * server.js에서 이 콜백을 설정하면, KIS에서 데이터가 올 때마다 호출됨
    */
-  onDataReceived?: (data: KisRealtimeData) => void;
+  onDataReceived?: (data: RealtimePrice) => void;
 
   /**
    * 연결 종료
