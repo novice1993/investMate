@@ -14,6 +14,7 @@ const handle = app.getRequestHandler();
 
 // KIS WebSocket 클라이언트 생성
 const kisClient = new KisWebSocketClient();
+let isKisConnected = false;
 
 app.prepare().then(async () => {
   // KIS WebSocket 연결
@@ -21,9 +22,11 @@ app.prepare().then(async () => {
     console.log("[Server] KIS WebSocket 연결 시도...");
     await kisClient.connect();
     console.log("[Server] ✅ KIS WebSocket 연결 완료");
+    isKisConnected = true;
   } catch (error) {
     console.error("[Server] ❌ KIS WebSocket 연결 실패:", error);
     console.error("[Server] ⚠️  실시간 시세 기능이 비활성화됩니다.");
+    isKisConnected = false;
   }
   // HTTP Server 생성
   const server = createServer(async (req, res) => {
@@ -57,9 +60,21 @@ app.prepare().then(async () => {
   io.on("connection", (socket) => {
     if (dev) console.log("[Socket.io] 클라이언트 연결:", socket.id);
 
+    // KIS 연결 상태를 클라이언트에 전달
+    socket.emit("kis-status", { connected: isKisConnected });
+
     // 프론트엔드 구독 요청 → KIS에 구독 전달
     socket.on("subscribe", ({ stockCode }) => {
       if (dev) console.log(`[Socket.io] ${stockCode} 구독 요청`);
+
+      // KIS가 연결되지 않았으면 에러 응답
+      if (!isKisConnected) {
+        socket.emit("subscription-error", {
+          stockCode,
+          message: "KIS WebSocket이 연결되지 않았습니다. (장 마감 또는 서버 오류)",
+        });
+        return;
+      }
 
       // Socket.io Room 참여
       socket.join(`stock:${stockCode}`);
