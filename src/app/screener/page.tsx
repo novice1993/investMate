@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFinancialMetrics, type FinancialMetricRow } from "@/hooks/useFinancialMetrics";
 
 export default function ScreenerPage() {
@@ -8,6 +8,28 @@ export default function ScreenerPage() {
   const [roeMin, setRoeMin] = useState("");
   const [roeMax, setRoeMax] = useState("");
   const [debtRatioMax, setDebtRatioMax] = useState("");
+
+  // 각 기업의 최신 분기 데이터만 필터링
+  const latestMetrics = useMemo(() => {
+    const metricsMap = new Map<string, FinancialMetricRow>();
+
+    metrics.forEach((metric) => {
+      const existing = metricsMap.get(metric.corp_code);
+
+      if (!existing) {
+        metricsMap.set(metric.corp_code, metric);
+      } else {
+        // 더 최신 데이터인지 확인 (연도 > 분기 순서로 비교)
+        const isNewer = metric.year > existing.year || (metric.year === existing.year && metric.quarter > existing.quarter);
+
+        if (isNewer) {
+          metricsMap.set(metric.corp_code, metric);
+        }
+      }
+    });
+
+    return Array.from(metricsMap.values());
+  }, [metrics]);
 
   const handleSearch = () => {
     fetchMetrics({
@@ -67,7 +89,7 @@ export default function ScreenerPage() {
         <div className="col-span-9 bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-900">필터링 결과</h2>
-            <span className="text-sm text-gray-500">{loading ? "검색 중..." : `총 ${metrics.length}개 종목`}</span>
+            <span className="text-sm text-gray-500">{loading ? "검색 중..." : `총 ${latestMetrics.length}개 종목`}</span>
           </div>
 
           {/* 에러 */}
@@ -77,10 +99,10 @@ export default function ScreenerPage() {
           {loading && <div className="p-8 text-center text-gray-500">데이터를 불러오는 중...</div>}
 
           {/* 데이터 없음 */}
-          {!loading && !error && metrics.length === 0 && <div className="p-8 text-center text-gray-500">검색 조건에 맞는 종목이 없습니다</div>}
+          {!loading && !error && latestMetrics.length === 0 && <div className="p-8 text-center text-gray-500">검색 조건에 맞는 종목이 없습니다</div>}
 
           {/* 테이블 (러프하게!) */}
-          {!loading && metrics.length > 0 && (
+          {!loading && latestMetrics.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -91,17 +113,32 @@ export default function ScreenerPage() {
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">부채비율 (%)</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">영업이익률 (%)</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">순이익률 (%)</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">매출 YoY (%)</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">영업이익 YoY (%)</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700">순이익 YoY (%)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {metrics.map((metric) => (
-                    <tr key={metric.corp_code} className="hover:bg-gray-50 cursor-pointer">
+                  {latestMetrics.map((metric) => (
+                    <tr key={`${metric.corp_code}-${metric.year}-${metric.quarter}`} className="hover:bg-gray-50 cursor-pointer">
                       <td className="px-4 py-3 text-sm text-gray-900">{metric.corp_name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{metric.stock_code}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">{metric.roe.toFixed(1)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">{metric.debt_ratio.toFixed(1)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">{metric.operating_margin.toFixed(1)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">{metric.net_margin.toFixed(1)}</td>
+                      <td className={`px-4 py-3 text-sm text-right font-medium ${metric.revenue_yoy >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                        {metric.revenue_yoy >= 0 ? "+" : ""}
+                        {metric.revenue_yoy.toFixed(1)}
+                      </td>
+                      <td className={`px-4 py-3 text-sm text-right font-medium ${metric.operating_profit_yoy >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                        {metric.operating_profit_yoy >= 0 ? "+" : ""}
+                        {metric.operating_profit_yoy.toFixed(1)}
+                      </td>
+                      <td className={`px-4 py-3 text-sm text-right font-medium ${metric.net_income_yoy >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                        {metric.net_income_yoy >= 0 ? "+" : ""}
+                        {metric.net_income_yoy.toFixed(1)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

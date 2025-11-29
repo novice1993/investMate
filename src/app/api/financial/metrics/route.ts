@@ -7,7 +7,7 @@ import { getSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
  * @query roeMin - ROE 최소값 (%)
  * @query roeMax - ROE 최대값 (%)
  * @query debtRatioMax - 부채비율 최대값 (%)
- * @query limit - 조회 개수 (기본값: 100)
+ * @query limit - 조회 개수 (기본값: 1000)
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const roeMin = parseFloat(searchParams.get("roeMin") || "0");
   const roeMax = parseFloat(searchParams.get("roeMax") || "100");
   const debtRatioMax = parseFloat(searchParams.get("debtRatioMax") || "100");
-  const limit = parseInt(searchParams.get("limit") || "100", 10);
+  const limit = parseInt(searchParams.get("limit") || "1000", 10);
 
   try {
     const supabase = getSupabaseClient();
