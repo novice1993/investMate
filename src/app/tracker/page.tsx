@@ -1,12 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { RealtimePriceChart } from "@/components/charts/RealtimePriceChart";
+import { RealtimePrice } from "@/core/entities/stock-price.entity";
 import { useRealtimePrice } from "@/hooks/useRealtimePrice";
+
+interface PriceHistory {
+  timestamp: string;
+  price: number;
+}
 
 export default function TrackerPage() {
   const { prices, subscribe, unsubscribe, isConnected, isKisConnected, error } = useRealtimePrice();
   const [stockCode, setStockCode] = useState("");
   const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [selectedStock, setSelectedStock] = useState<string | null>(null);
+  const [priceHistoryMap, setPriceHistoryMap] = useState<Map<string, PriceHistory[]>>(new Map());
+  const prevPricesRef = useRef<Map<string, RealtimePrice>>(new Map());
+
+  // 실시간 가격 업데이트 시 히스토리에 추가
+  useEffect(() => {
+    prices.forEach((priceData, code) => {
+      const prevPrice = prevPricesRef.current.get(code);
+
+      // 가격이 변경되었을 때만 히스토리에 추가
+      if (!prevPrice || prevPrice.price !== priceData.price) {
+        setPriceHistoryMap((prev) => {
+          const newMap = new Map(prev);
+          const history = newMap.get(code) || [];
+          const newHistory = [
+            ...history,
+            {
+              timestamp: priceData.timestamp,
+              price: priceData.price,
+            },
+          ].slice(-100); // 최근 100개만 유지
+          newMap.set(code, newHistory);
+          return newMap;
+        });
+      }
+    });
+
+    prevPricesRef.current = new Map(prices);
+  }, [prices]);
 
   const handleAdd = () => {
     const code = stockCode.trim();
@@ -26,16 +62,25 @@ export default function TrackerPage() {
     setWatchlist([...watchlist, code]);
     subscribe(code);
     setStockCode("");
+
+    // 첫 번째 종목 추가 시 자동 선택
+    if (watchlist.length === 0) {
+      setSelectedStock(code);
+    }
   };
 
   const handleRemove = (code: string) => {
     setWatchlist(watchlist.filter((c) => c !== code));
     unsubscribe(code);
+
+    // 선택된 종목이 삭제되면 선택 해제
+    if (selectedStock === code) {
+      setSelectedStock(null);
+    }
   };
 
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("ko-KR");
+  const handleSelectStock = (code: string) => {
+    setSelectedStock(code);
   };
 
   const formatNumber = (num: number) => {
@@ -77,97 +122,127 @@ export default function TrackerPage() {
         )}
       </div>
 
-      {/* 종목 추가 */}
-      <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4 mb-6">
-        <h2 className="text-lg font-semibold text-light-gray-90 mb-3">종목 추가</h2>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="종목코드 입력 (예: 005930)"
-            value={stockCode}
-            onChange={(e) => setStockCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            className="flex-1 border border-light-gray-30 rounded px-3 py-2 text-sm"
-            maxLength={6}
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!isConnected || !isKisConnected}
-            className="bg-light-primary-50 text-light-gray-0 px-4 py-2 rounded hover:bg-light-primary-60 transition-colors disabled:bg-light-gray-40 disabled:cursor-not-allowed"
-          >
-            추가
-          </button>
-        </div>
-        <p className="text-xs text-light-gray-40 mt-2">예) 삼성전자: 005930, SK하이닉스: 000660, NAVER: 035420</p>
-      </div>
+      <div className="grid grid-cols-12 gap-6">
+        {/* 좌측: 관심 종목 리스트 */}
+        <div className="col-span-5 space-y-6">
+          {/* 종목 추가 */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">종목 추가</h2>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="종목코드 입력 (예: 005930)"
+                value={stockCode}
+                onChange={(e) => setStockCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                className="flex-1 border border-light-gray-30 rounded px-3 py-2 text-sm"
+                maxLength={6}
+              />
+              <button
+                onClick={handleAdd}
+                disabled={!isConnected || !isKisConnected}
+                className="bg-light-primary-50 text-light-gray-0 px-4 py-2 rounded hover:bg-light-primary-60 transition-colors disabled:bg-light-gray-40 disabled:cursor-not-allowed"
+              >
+                추가
+              </button>
+            </div>
+            <p className="text-xs text-light-gray-40 mt-2">예) 삼성전자: 005930, SK하이닉스: 000660, NAVER: 035420</p>
+          </div>
 
-      {/* 관심 종목 테이블 */}
-      <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
-        <h2 className="text-lg font-semibold text-light-gray-90 mb-3">관심 종목 ({watchlist.length})</h2>
+          {/* 관심 종목 테이블 */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">관심 종목 ({watchlist.length})</h2>
 
-        {watchlist.length === 0 ? (
-          <div className="p-8 text-center text-light-gray-40">종목을 추가해주세요</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-light-gray-5">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-light-gray-70">종목코드</th>
-                  <th className="px-4 py-2 text-right text-sm font-medium text-light-gray-70">현재가</th>
-                  <th className="px-4 py-2 text-right text-sm font-medium text-light-gray-70">전일대비</th>
-                  <th className="px-4 py-2 text-right text-sm font-medium text-light-gray-70">등락률</th>
-                  <th className="px-4 py-2 text-right text-sm font-medium text-light-gray-70">거래량</th>
-                  <th className="px-4 py-2 text-right text-sm font-medium text-light-gray-70">체결시간</th>
-                  <th className="px-4 py-2 text-center text-sm font-medium text-light-gray-70">삭제</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-light-gray-20">
+            {watchlist.length === 0 ? (
+              <div className="p-8 text-center text-light-gray-40">종목을 추가해주세요</div>
+            ) : (
+              <div className="space-y-2">
                 {watchlist.map((code) => {
                   const price = prices.get(code);
+                  const isSelected = selectedStock === code;
                   return (
-                    <tr key={code} className="hover:bg-light-gray-5">
-                      <td className="px-4 py-3 text-sm text-light-gray-90 font-medium">{code}</td>
-                      {price ? (
-                        <>
-                          <td className="px-4 py-3 text-sm text-right text-light-gray-90 font-bold">{formatNumber(price.price)}원</td>
-                          <td
-                            className={`px-4 py-3 text-sm text-right font-medium ${
-                              price.changeSign === "rise" ? "text-light-danger-50" : price.changeSign === "fall" ? "text-light-information-50" : "text-light-gray-90"
-                            }`}
-                          >
-                            {price.changeSign === "rise" ? "+" : price.changeSign === "fall" ? "-" : ""}
-                            {formatNumber(Math.abs(price.change))}
-                          </td>
-                          <td
-                            className={`px-4 py-3 text-sm text-right font-medium ${
-                              price.changeSign === "rise" ? "text-light-danger-50" : price.changeSign === "fall" ? "text-light-information-50" : "text-light-gray-90"
-                            }`}
-                          >
-                            {price.changeSign === "rise" ? "+" : price.changeSign === "fall" ? "-" : ""}
-                            {Math.abs(price.changeRate).toFixed(2)}%
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-light-gray-90">{formatNumber(price.volume)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-light-gray-50">{formatTime(price.timestamp)}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-4 py-3 text-sm text-right text-light-gray-40" colSpan={5}>
-                            데이터 수신 대기 중...
-                          </td>
-                        </>
-                      )}
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleRemove(code)} className="text-light-danger-50 hover:text-light-danger-60 text-sm">
+                    <div
+                      key={code}
+                      onClick={() => handleSelectStock(code)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? "border-light-primary-50 bg-light-primary-5" : "border-light-gray-20 hover:bg-light-gray-5"}`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-semibold text-light-gray-90">{code}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemove(code);
+                          }}
+                          className="text-light-danger-50 hover:text-light-danger-60 text-xs"
+                        >
                           삭제
                         </button>
-                      </td>
-                    </tr>
+                      </div>
+                      {price ? (
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-light-gray-50">현재가</span>
+                            <span className="text-sm font-bold text-light-gray-90">{formatNumber(price.price)}원</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-light-gray-50">등락률</span>
+                            <span
+                              className={`text-sm font-medium ${
+                                price.changeSign === "rise" ? "text-light-danger-50" : price.changeSign === "fall" ? "text-light-information-50" : "text-light-gray-90"
+                              }`}
+                            >
+                              {price.changeSign === "rise" ? "+" : price.changeSign === "fall" ? "-" : ""}
+                              {Math.abs(price.changeRate).toFixed(2)}%
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-light-gray-40">데이터 수신 대기 중...</p>
+                      )}
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* 우측: 실시간 차트 */}
+        <div className="col-span-7">
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4 h-full">
+            {selectedStock ? (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-light-gray-90">실시간 차트 - {selectedStock}</h2>
+                  {prices.get(selectedStock) && (
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-light-gray-90">{formatNumber(prices.get(selectedStock)!.price)}원</div>
+                      <div
+                        className={`text-sm font-medium ${
+                          prices.get(selectedStock)!.changeSign === "rise"
+                            ? "text-light-danger-50"
+                            : prices.get(selectedStock)!.changeSign === "fall"
+                              ? "text-light-information-50"
+                              : "text-light-gray-90"
+                        }`}
+                      >
+                        {prices.get(selectedStock)!.changeSign === "rise" ? "+" : prices.get(selectedStock)!.changeSign === "fall" ? "-" : ""}
+                        {Math.abs(prices.get(selectedStock)!.changeRate).toFixed(2)}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="h-[500px]">
+                  <RealtimePriceChart data={priceHistoryMap.get(selectedStock) || []} />
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-light-gray-40">종목을 선택하면 실시간 차트가 표시됩니다</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
