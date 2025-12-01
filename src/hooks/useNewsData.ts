@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NewsArticle } from "@/core/entities/news.entity";
+import { jsonHttpClient } from "@/shared/lib/http";
 
 interface UseNewsDataReturn {
   news: NewsArticle[];
@@ -19,15 +20,10 @@ export function useNewsData(autoFetch = true): UseNewsDataReturn {
     setError(null);
 
     try {
-      const response = await fetch("/api/news?source=mk-stock,hankyung-economy,hankyung-finance");
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      const result = await jsonHttpClient.get<{ data: NewsArticle[] }>("/api/news?source=mk-stock,hankyung-economy,hankyung-finance");
 
-      const newsData = await response.json();
-
-      if (newsData.data && Array.isArray(newsData.data)) {
-        setNews(newsData.data);
+      if (result.data && Array.isArray(result.data)) {
+        setNews(result.data);
       } else {
         setNews([]);
       }

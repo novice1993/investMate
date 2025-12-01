@@ -2,16 +2,36 @@
 
 import { useState, useMemo } from "react";
 import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
-import { useFinancialMetrics, type FinancialMetricRow } from "@/hooks/useFinancialMetrics";
+import { useFinancialMetrics, type FinancialMetricRow } from "./useFinancialMetrics";
+import { useMetricsHistory } from "./useMetricsHistory";
+
+interface Filters {
+  roeMin: string;
+  roeMax: string;
+  debtRatioMax: string;
+}
+
+const initialFilters: Filters = {
+  roeMin: "",
+  roeMax: "",
+  debtRatioMax: "",
+};
 
 export default function ScreenerPage() {
-  const { metrics, loading, error, fetchMetrics } = useFinancialMetrics();
-  const [roeMin, setRoeMin] = useState("");
-  const [roeMax, setRoeMax] = useState("");
-  const [debtRatioMax, setDebtRatioMax] = useState("");
-  const [selectedMetric, setSelectedMetric] = useState<FinancialMetricRow | null>(null);
-  const [metricsHistory, setMetricsHistory] = useState<FinancialMetricRow[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const { metrics, isLoading, error, search } = useFinancialMetrics();
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [selectedCorpCode, setSelectedCorpCode] = useState<string | null>(null);
+  const { history: metricsHistory, isLoading: loadingHistory } = useMetricsHistory(selectedCorpCode);
+
+  // 선택된 종목 정보 (UI 표시용)
+  const selectedMetric = useMemo(() => {
+    if (!selectedCorpCode) return null;
+    return metrics.find((m) => m.corp_code === selectedCorpCode) ?? null;
+  }, [metrics, selectedCorpCode]);
+
+  const updateFilter = (key: keyof Filters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   // 각 기업의 최신 분기 데이터만 필터링
   const latestMetrics = useMemo(() => {
@@ -36,39 +56,19 @@ export default function ScreenerPage() {
   }, [metrics]);
 
   const handleSearch = () => {
-    fetchMetrics({
-      roeMin: roeMin ? parseFloat(roeMin) : undefined,
-      roeMax: roeMax ? parseFloat(roeMax) : undefined,
-      debtRatioMax: debtRatioMax ? parseFloat(debtRatioMax) : undefined,
+    search({
+      roeMin: filters.roeMin ? parseFloat(filters.roeMin) : undefined,
+      roeMax: filters.roeMax ? parseFloat(filters.roeMax) : undefined,
+      debtRatioMax: filters.debtRatioMax ? parseFloat(filters.debtRatioMax) : undefined,
     });
   };
 
   const handleReset = () => {
-    setRoeMin("");
-    setRoeMax("");
-    setDebtRatioMax("");
+    setFilters(initialFilters);
   };
 
-  const handleSelectMetric = async (metric: FinancialMetricRow) => {
-    setSelectedMetric(metric);
-    setLoadingHistory(true);
-
-    try {
-      const response = await fetch(`/api/financial/metrics/history?corpCode=${metric.corp_code}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setMetricsHistory(data.data);
-      } else {
-        console.error("Failed to fetch metrics history:", data.error);
-        setMetricsHistory([]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch metrics history:", err);
-      setMetricsHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
+  const handleSelectMetric = (metric: FinancialMetricRow) => {
+    setSelectedCorpCode(metric.corp_code);
   };
 
   return (
@@ -88,15 +88,33 @@ export default function ScreenerPage() {
             <div>
               <label className="block text-sm font-medium text-light-gray-70 mb-2">ROE (%)</label>
               <div className="flex flex-col space-y-2">
-                <input type="number" placeholder="최소" value={roeMin} onChange={(e) => setRoeMin(e.target.value)} className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm" />
-                <input type="number" placeholder="최대" value={roeMax} onChange={(e) => setRoeMax(e.target.value)} className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm" />
+                <input
+                  type="number"
+                  placeholder="최소"
+                  value={filters.roeMin}
+                  onChange={(e) => updateFilter("roeMin", e.target.value)}
+                  className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="최대"
+                  value={filters.roeMax}
+                  onChange={(e) => updateFilter("roeMax", e.target.value)}
+                  className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm"
+                />
               </div>
             </div>
 
             {/* 부채비율 필터 */}
             <div>
               <label className="block text-sm font-medium text-light-gray-70 mb-2">부채비율 (%)</label>
-              <input type="number" placeholder="최대" value={debtRatioMax} onChange={(e) => setDebtRatioMax(e.target.value)} className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm" />
+              <input
+                type="number"
+                placeholder="최대"
+                value={filters.debtRatioMax}
+                onChange={(e) => updateFilter("debtRatioMax", e.target.value)}
+                className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm"
+              />
             </div>
 
             {/* 버튼 */}
@@ -115,20 +133,20 @@ export default function ScreenerPage() {
         <div className="col-span-9 bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-light-gray-90">필터링 결과</h2>
-            <span className="text-sm text-light-gray-40">{loading ? "검색 중..." : `총 ${latestMetrics.length}개 종목`}</span>
+            <span className="text-sm text-light-gray-40">{isLoading ? "검색 중..." : `총 ${latestMetrics.length}개 종목`}</span>
           </div>
 
           {/* 에러 */}
           {error && <div className="p-4 bg-light-danger-5 border border-light-danger-20 rounded text-light-danger-70 text-sm">{error}</div>}
 
           {/* 로딩 */}
-          {loading && <div className="p-8 text-center text-light-gray-40">데이터를 불러오는 중...</div>}
+          {isLoading && <div className="p-8 text-center text-light-gray-40">데이터를 불러오는 중...</div>}
 
           {/* 데이터 없음 */}
-          {!loading && !error && latestMetrics.length === 0 && <div className="p-8 text-center text-light-gray-40">검색 조건에 맞는 종목이 없습니다</div>}
+          {!isLoading && !error && latestMetrics.length === 0 && <div className="p-8 text-center text-light-gray-40">검색 조건에 맞는 종목이 없습니다</div>}
 
           {/* 테이블 (러프하게!) */}
-          {!loading && latestMetrics.length > 0 && (
+          {!isLoading && latestMetrics.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-light-gray-5">
@@ -187,7 +205,7 @@ export default function ScreenerPage() {
                 <h2 className="text-xl font-semibold text-light-gray-90">{selectedMetric.corp_name}</h2>
                 <p className="text-sm text-light-gray-50 mt-1">종목코드: {selectedMetric.stock_code}</p>
               </div>
-              <button onClick={() => setSelectedMetric(null)} className="text-light-gray-50 hover:text-light-gray-70 text-sm">
+              <button onClick={() => setSelectedCorpCode(null)} className="text-light-gray-50 hover:text-light-gray-70 text-sm">
                 닫기
               </button>
             </div>
