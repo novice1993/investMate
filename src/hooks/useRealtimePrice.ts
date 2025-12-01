@@ -20,6 +20,7 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
   const [isKisConnected, setIsKisConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const subscribedStocksRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // Socket.io 클라이언트 연결 (자동으로 현재 호스트 사용)
@@ -67,8 +68,12 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
       });
     });
 
-    // 클린업
+    // 클린업: 페이지 이탈 시 모든 구독 해제 후 disconnect
     return () => {
+      subscribedStocksRef.current.forEach((stockCode) => {
+        socket.emit("unsubscribe", { stockCode });
+      });
+      subscribedStocksRef.current.clear();
       socket.disconnect();
     };
   }, []);
@@ -77,6 +82,7 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
     if (socketRef.current?.connected) {
       console.log(`[Socket.io] ${stockCode} 구독 요청`);
       socketRef.current.emit("subscribe", { stockCode });
+      subscribedStocksRef.current.add(stockCode);
     }
   }, []);
 
@@ -84,6 +90,7 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
     if (socketRef.current?.connected) {
       console.log(`[Socket.io] ${stockCode} 구독 해제`);
       socketRef.current.emit("unsubscribe", { stockCode });
+      subscribedStocksRef.current.delete(stockCode);
 
       // 로컬 상태에서도 제거
       setPrices((prev) => {

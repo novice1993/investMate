@@ -56,9 +56,22 @@ app.prepare().then(async () => {
     }
   };
 
+  // KIS 연결 상태 변경 시 모든 클라이언트에 전파
+  kisClient.onConnectionStatusChanged = (connected) => {
+    console.log(`[Server] KIS 연결 상태 변경: ${connected ? "연결됨" : "연결 해제"}`);
+    isKisConnected = connected;
+    io.emit("kis-status", { connected });
+  };
+
+  // 클라이언트별 구독 종목 추적
+  const clientSubscriptions = new Map();
+
   // Socket.io 이벤트 핸들러
   io.on("connection", (socket) => {
     if (dev) console.log("[Socket.io] 클라이언트 연결:", socket.id);
+
+    // 클라이언트 구독 목록 초기화
+    clientSubscriptions.set(socket.id, new Set());
 
     // KIS 연결 상태를 클라이언트에 전달
     socket.emit("kis-status", { connected: isKisConnected });
@@ -79,6 +92,9 @@ app.prepare().then(async () => {
       // Socket.io Room 참여
       socket.join(`stock:${stockCode}`);
 
+      // 클라이언트 구독 목록에 추가
+      clientSubscriptions.get(socket.id)?.add(stockCode);
+
       // KIS WebSocket에 구독 요청
       kisClient.subscribe(stockCode);
     });
@@ -90,12 +106,25 @@ app.prepare().then(async () => {
       // Socket.io Room 나가기
       socket.leave(`stock:${stockCode}`);
 
+      // 클라이언트 구독 목록에서 제거
+      clientSubscriptions.get(socket.id)?.delete(stockCode);
+
       // KIS WebSocket에 구독 해제 요청
       kisClient.unsubscribe(stockCode);
     });
 
     socket.on("disconnect", () => {
       if (dev) console.log("[Socket.io] 클라이언트 연결 해제:", socket.id);
+
+      // 해당 클라이언트가 구독 중이던 모든 종목 KIS에서 구독 해제
+      const subscriptions = clientSubscriptions.get(socket.id);
+      if (subscriptions) {
+        subscriptions.forEach((stockCode) => {
+          if (dev) console.log(`[Socket.io] ${stockCode} 자동 구독 해제 (클라이언트 disconnect)`);
+          kisClient.unsubscribe(stockCode);
+        });
+        clientSubscriptions.delete(socket.id);
+      }
     });
   });
 
