@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
 import { useFinancialMetrics, type FinancialMetricRow } from "@/hooks/useFinancialMetrics";
 
 export default function ScreenerPage() {
@@ -8,6 +9,9 @@ export default function ScreenerPage() {
   const [roeMin, setRoeMin] = useState("");
   const [roeMax, setRoeMax] = useState("");
   const [debtRatioMax, setDebtRatioMax] = useState("");
+  const [selectedMetric, setSelectedMetric] = useState<FinancialMetricRow | null>(null);
+  const [metricsHistory, setMetricsHistory] = useState<FinancialMetricRow[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // 각 기업의 최신 분기 데이터만 필터링
   const latestMetrics = useMemo(() => {
@@ -45,6 +49,28 @@ export default function ScreenerPage() {
     setDebtRatioMax("");
   };
 
+  const handleSelectMetric = async (metric: FinancialMetricRow) => {
+    setSelectedMetric(metric);
+    setLoadingHistory(true);
+
+    try {
+      const response = await fetch(`/api/financial/metrics/history?corpCode=${metric.corp_code}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMetricsHistory(data.data);
+      } else {
+        console.error("Failed to fetch metrics history:", data.error);
+        setMetricsHistory([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch metrics history:", err);
+      setMetricsHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
@@ -61,9 +87,9 @@ export default function ScreenerPage() {
             {/* ROE 필터 */}
             <div>
               <label className="block text-sm font-medium text-light-gray-70 mb-2">ROE (%)</label>
-              <div className="flex space-x-2">
-                <input type="number" placeholder="최소" value={roeMin} onChange={(e) => setRoeMin(e.target.value)} className="flex-1 border border-light-gray-30 rounded px-2 py-1 text-sm" />
-                <input type="number" placeholder="최대" value={roeMax} onChange={(e) => setRoeMax(e.target.value)} className="flex-1 border border-light-gray-30 rounded px-2 py-1 text-sm" />
+              <div className="flex flex-col space-y-2">
+                <input type="number" placeholder="최소" value={roeMin} onChange={(e) => setRoeMin(e.target.value)} className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm" />
+                <input type="number" placeholder="최대" value={roeMax} onChange={(e) => setRoeMax(e.target.value)} className="w-full border border-light-gray-30 rounded px-2 py-1 text-sm" />
               </div>
             </div>
 
@@ -120,7 +146,13 @@ export default function ScreenerPage() {
                 </thead>
                 <tbody className="divide-y divide-light-gray-20">
                   {latestMetrics.map((metric) => (
-                    <tr key={`${metric.corp_code}-${metric.year}-${metric.quarter}`} className="hover:bg-light-gray-5 cursor-pointer">
+                    <tr
+                      key={`${metric.corp_code}-${metric.year}-${metric.quarter}`}
+                      onClick={() => handleSelectMetric(metric)}
+                      className={`cursor-pointer transition-colors ${
+                        selectedMetric?.corp_code === metric.corp_code ? "bg-light-primary-5 border-l-4 border-l-light-primary-50" : "hover:bg-light-gray-5"
+                      }`}
+                    >
                       <td className="px-4 py-3 text-sm text-light-gray-90">{metric.corp_name}</td>
                       <td className="px-4 py-3 text-sm text-light-gray-50">{metric.stock_code}</td>
                       <td className="px-4 py-3 text-sm text-right text-light-gray-90 font-medium">{metric.roe.toFixed(1)}</td>
@@ -146,6 +178,23 @@ export default function ScreenerPage() {
             </div>
           )}
         </div>
+
+        {/* 선택된 종목 상세 차트 */}
+        {selectedMetric && (
+          <div className="col-span-12 bg-light-gray-0 rounded-lg border border-light-gray-20 p-6 mt-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-light-gray-90">{selectedMetric.corp_name}</h2>
+                <p className="text-sm text-light-gray-50 mt-1">종목코드: {selectedMetric.stock_code}</p>
+              </div>
+              <button onClick={() => setSelectedMetric(null)} className="text-light-gray-50 hover:text-light-gray-70 text-sm">
+                닫기
+              </button>
+            </div>
+
+            {loadingHistory ? <div className="p-8 text-center text-light-gray-40">데이터를 불러오는 중...</div> : <FinancialMetricsChart data={metricsHistory} />}
+          </div>
+        )}
       </div>
     </div>
   );
