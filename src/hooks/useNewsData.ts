@@ -1,56 +1,37 @@
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NewsArticle } from "@/core/entities/news.entity";
 import { jsonHttpClient } from "@/shared/lib/http";
 
-interface UseNewsDataReturn {
-  news: NewsArticle[];
-  loading: boolean;
-  error: string | null;
-  fetchNewsData: () => Promise<void>;
-  clearNews: () => void;
+const NEWS_QUERY_KEY = ["news"];
+
+async function fetchNews(): Promise<NewsArticle[]> {
+  const result = await jsonHttpClient.get<{ data: NewsArticle[] }>("/api/news?source=mk-stock,hankyung-economy,hankyung-finance");
+
+  if (result.data && Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  return [];
 }
 
-export function useNewsData(autoFetch = true): UseNewsDataReturn {
-  const [news, setNews] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function useNewsData(autoFetch = true) {
+  const queryClient = useQueryClient();
 
-  const fetchNewsData = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await jsonHttpClient.get<{ data: NewsArticle[] }>("/api/news?source=mk-stock,hankyung-economy,hankyung-finance");
-
-      if (result.data && Array.isArray(result.data)) {
-        setNews(result.data);
-      } else {
-        setNews([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "뉴스를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: NEWS_QUERY_KEY,
+    queryFn: fetchNews,
+    enabled: autoFetch,
+  });
 
   const clearNews = () => {
-    setNews([]);
-    setError(null);
+    queryClient.setQueryData(NEWS_QUERY_KEY, []);
   };
 
-  // 자동 로드 기능
-  useEffect(() => {
-    if (autoFetch) {
-      fetchNewsData();
-    }
-  }, [autoFetch]);
-
   return {
-    news,
-    loading,
-    error,
-    fetchNewsData,
+    news: data ?? [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+    fetchNewsData: refetch,
     clearNews,
   };
 }
