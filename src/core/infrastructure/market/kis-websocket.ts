@@ -45,6 +45,9 @@ export class KisWebSocketClient {
   private ws: WebSocket | null = null;
   private approvalKey: string = "";
   private isConnected: boolean = false;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+  private reconnectDelay: number = 5000; // 5초
 
   /**
    * KIS WebSocket 서버에 연결
@@ -78,10 +81,11 @@ export class KisWebSocketClient {
           reject(error);
         });
 
-        // 5. 연결 종료
+        // 5. 연결 종료 → 자동 재연결 시도
         this.ws.on("close", () => {
           console.log("[KIS WS] 연결 종료");
           this.isConnected = false;
+          this.attemptReconnect();
         });
 
         // 6. 메시지 수신 (KIS에서 실시간 데이터가 올 때마다 호출됨)
@@ -100,6 +104,13 @@ export class KisWebSocketClient {
   private handleMessage(data: WebSocket.Data): void {
     try {
       const message = data.toString();
+
+      // PINGPONG 메시지 처리: 동일한 메시지로 응답하여 연결 유지
+      if (message.includes('"tr_id":"PINGPONG"')) {
+        this.ws?.send(message);
+        return;
+      }
+
       console.log("[KIS WS] 메시지 수신:", message.substring(0, 100)); // 앞 100자만 로그
 
       // 메시지 파싱하고 콜백 호출
@@ -237,11 +248,42 @@ export class KisWebSocketClient {
   onDataReceived?: (data: RealtimePrice) => void;
 
   /**
+   * 자동 재연결 시도
+   */
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error(`[KIS WS] 최대 재연결 시도 횟수(${this.maxReconnectAttempts}회) 초과. 재연결 중단.`);
+      this.onConnectionStatusChanged?.(false);
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`[KIS WS] ${this.reconnectDelay / 1000}초 후 재연결 시도 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+    setTimeout(async () => {
+      try {
+        await this.connect();
+        console.log("[KIS WS] 재연결 성공");
+        this.reconnectAttempts = 0; // 성공 시 카운터 리셋
+        this.onConnectionStatusChanged?.(true);
+      } catch (error) {
+        console.error("[KIS WS] 재연결 실패:", error);
+      }
+    }, this.reconnectDelay);
+  }
+
+  /**
+   * 연결 상태 변경 시 호출될 콜백
+   */
+  onConnectionStatusChanged?: (connected: boolean) => void;
+
+  /**
    * 연결 종료
    */
   disconnect(): void {
     if (this.ws) {
       console.log("[KIS WS] 연결 종료 요청");
+      this.reconnectAttempts = this.maxReconnectAttempts; // 수동 종료 시 재연결 방지
       this.ws.close();
       this.ws = null;
       this.isConnected = false;
