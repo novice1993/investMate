@@ -5,7 +5,7 @@ import { jsonHttpClient } from "@/shared/lib/http";
 const NEWS_QUERY_KEY = ["news"];
 
 async function fetchNews(): Promise<NewsArticle[]> {
-  const result = await jsonHttpClient.get<{ data: NewsArticle[] }>("/api/news?source=mk-stock,hankyung-economy,hankyung-finance");
+  const result = await jsonHttpClient.get<{ data: NewsArticle[] }>("/api/news");
 
   if (result.data && Array.isArray(result.data)) {
     return result.data;
