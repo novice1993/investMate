@@ -90,10 +90,10 @@ export const getPeriodStockPrice = async (stockCode: string, periodCode: "D" | "
     tr_id: "FHKST03010100", // 국내주식기간별시세
   };
 
-  // 날짜 범위 계산 (오늘부터 과거 100일)
+  // 날짜 범위 계산 (오늘부터 과거 200일 - 영업일 100일 확보)
   const today = new Date();
   const startDate = new Date(today);
-  startDate.setDate(today.getDate() - 100);
+  startDate.setDate(today.getDate() - 200);
 
   const formatDate = (date: Date): string => {
     const year = date.getFullYear();

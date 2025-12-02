@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useFinancialMetrics, type FinancialMetricRow } from "@/app/screener/useFinancialMetrics";
 import { useMetricsHistory } from "@/app/screener/useMetricsHistory";
+import { useDailyPrices } from "@/app/tracker/useDailyPrices";
 import { useRealtimePrice } from "@/app/tracker/useRealtimePrice";
 import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
 import { StockPriceChart } from "@/components/charts/StockPriceChart";
@@ -30,6 +31,9 @@ export default function HomePage() {
 
   // 선택된 종목의 재무 히스토리
   const { history: metricsHistory, isLoading: historyLoading } = useMetricsHistory(selectedCorpCode);
+
+  // 선택된 종목의 일봉 데이터
+  const { candleData, isLoading: candleLoading } = useDailyPrices(selectedStockCode);
 
   // 스크리너에서 최신 분기만 표시
   const latestMetrics = useMemo(() => {
@@ -233,7 +237,11 @@ export default function HomePage() {
             <h2 className="text-lg font-semibold text-light-gray-90 mb-3">주가 차트 {selectedStockCode && `- ${selectedStockCode}`}</h2>
             {selectedStockCode ? (
               <div className="h-[300px]">
-                <StockPriceChart candleData={[]} realtimeData={priceHistoryMap.get(selectedStockCode) || []} />
+                {candleLoading ? (
+                  <div className="h-full flex items-center justify-center text-light-gray-40">일봉 데이터 로딩 중...</div>
+                ) : (
+                  <StockPriceChart candleData={candleData} realtimeData={priceHistoryMap.get(selectedStockCode) || []} />
+                )}
               </div>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-light-gray-40">종목을 선택하세요</div>
