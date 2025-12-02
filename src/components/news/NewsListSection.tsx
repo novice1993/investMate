@@ -41,7 +41,7 @@ export function NewsListSection({ variant = "full", showHeader = true, showFilte
               {loading ? "로딩중..." : "새로고침"}
             </button>
           </div>
-          <p className="text-gray-600 text-sm md:text-base">매일경제 · 한국경제 증권/경제 뉴스</p>
+          <p className="text-gray-600 text-sm md:text-base">매일경제 증권 뉴스</p>
         </div>
       )}
 

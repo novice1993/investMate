@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import { Security } from "@/core/entities/security.entity";
 import { HttpError } from "@/shared/lib/http";
 import { getCached, setCache } from "@/shared/lib/utils/cache";
-import { RawKrxRow } from "./security.type";
+import { RawKrxRow } from "./krx-market.types";
 
 const OTP_URL = "http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd";
 const DOWNLOAD_URL = "http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd";

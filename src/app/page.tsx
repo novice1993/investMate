@@ -1,86 +1,302 @@
-import Link from "next/link";
+"use client";
 
-export default function Home() {
-  const features = [
-    {
-      icon: "📊",
-      title: "시장 전체보기",
-      description: "KOSPI 전체 종목의 실시간 현황을 가상화 리스트로 빠르게 확인",
-      href: "/market",
-      color: "blue",
-    },
-    {
-      icon: "🔍",
-      title: "종목 스크리너",
-      description: "ROE, RSI 등 재무·기술 지표로 유망 종목을 체계적으로 발굴",
-      href: "/screener",
-      color: "green",
-    },
-    {
-      icon: "⚡",
-      title: "실시간 트래커",
-      description: "관심 종목의 실시간 변동을 모니터링하고 투자 타이밍 포착",
-      href: "/tracker",
-      color: "red",
-    },
-  ];
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useFinancialMetrics, type FinancialMetricRow } from "@/app/screener/useFinancialMetrics";
+import { useMetricsHistory } from "@/app/screener/useMetricsHistory";
+import { useDailyPrices } from "@/app/tracker/useDailyPrices";
+import { useRealtimePrice } from "@/app/tracker/useRealtimePrice";
+import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
+import { StockPriceChart } from "@/components/charts/StockPriceChart";
+import { RealtimePrice } from "@/core/entities/stock-price.entity";
+
+interface PriceHistory {
+  timestamp: string;
+  price: number;
+}
+
+export default function HomePage() {
+  // 실시간 시세 관련
+  const { prices, subscribe, unsubscribe, isConnected, isKisConnected, error: realtimeError } = useRealtimePrice();
+  const [stockCode, setStockCode] = useState("");
+  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [priceHistoryMap, setPriceHistoryMap] = useState<Map<string, PriceHistory[]>>(new Map());
+  const prevPricesRef = useRef<Map<string, RealtimePrice>>(new Map());
+
+  // 스크리너 관련
+  const { metrics, isLoading: metricsLoading, error: metricsError, search } = useFinancialMetrics();
+
+  // 선택된 종목 (워치리스트 또는 스크리너에서 선택)
+  const [selectedStockCode, setSelectedStockCode] = useState<string | null>(null);
+  const [selectedCorpCode, setSelectedCorpCode] = useState<string | null>(null);
+
+  // 선택된 종목의 재무 히스토리
+  const { history: metricsHistory, isLoading: historyLoading } = useMetricsHistory(selectedCorpCode);
+
+  // 선택된 종목의 일봉 데이터
+  const { candleData, isLoading: candleLoading } = useDailyPrices(selectedStockCode);
+
+  // 스크리너에서 최신 분기만 표시
+  const latestMetrics = useMemo(() => {
+    const metricsMap = new Map<string, FinancialMetricRow>();
+    metrics.forEach((metric) => {
+      const existing = metricsMap.get(metric.corp_code);
+      if (!existing) {
+        metricsMap.set(metric.corp_code, metric);
+      } else {
+        const isNewer = metric.year > existing.year || (metric.year === existing.year && metric.quarter > existing.quarter);
+        if (isNewer) {
+          metricsMap.set(metric.corp_code, metric);
+        }
+      }
+    });
+    return Array.from(metricsMap.values());
+  }, [metrics]);
+
+  // 선택된 종목 정보
+  const selectedMetric = useMemo(() => {
+    if (!selectedCorpCode) return null;
+    return metrics.find((m) => m.corp_code === selectedCorpCode) ?? null;
+  }, [metrics, selectedCorpCode]);
+
+  // 실시간 가격 히스토리 업데이트
+  useEffect(() => {
+    prices.forEach((priceData, code) => {
+      const prevPrice = prevPricesRef.current.get(code);
+      if (!prevPrice || prevPrice.price !== priceData.price) {
+        setPriceHistoryMap((prev) => {
+          const newMap = new Map(prev);
+          const history = newMap.get(code) || [];
+          const newHistory = [...history, { timestamp: priceData.timestamp, price: priceData.price }].slice(-100);
+          newMap.set(code, newHistory);
+          return newMap;
+        });
+      }
+    });
+    prevPricesRef.current = new Map(prices);
+  }, [prices]);
+
+  // 초기 스크리너 데이터 로드
+  const searchCallback = useCallback(() => {
+    search({});
+  }, [search]);
+
+  useEffect(() => {
+    searchCallback();
+  }, [searchCallback]);
+
+  const handleAddStock = () => {
+    const code = stockCode.trim();
+    if (!code) return;
+    if (code.length !== 6 || isNaN(Number(code))) {
+      alert("6자리 숫자 종목코드를 입력하세요 (예: 005930)");
+      return;
+    }
+    if (watchlist.includes(code)) {
+      alert("이미 추가된 종목입니다");
+      return;
+    }
+    setWatchlist([...watchlist, code]);
+    subscribe(code);
+    setStockCode("");
+    if (!selectedStockCode) {
+      setSelectedStockCode(code);
+    }
+  };
+
+  const handleRemoveStock = (code: string) => {
+    setWatchlist(watchlist.filter((c) => c !== code));
+    unsubscribe(code);
+    if (selectedStockCode === code) {
+      setSelectedStockCode(null);
+    }
+  };
+
+  const handleSelectWatchlistStock = (code: string) => {
+    setSelectedStockCode(code);
+    setSelectedCorpCode(null);
+  };
+
+  const handleSelectScreenerStock = (metric: FinancialMetricRow) => {
+    setSelectedCorpCode(metric.corp_code);
+    setSelectedStockCode(metric.stock_code);
+    if (!watchlist.includes(metric.stock_code)) {
+      setWatchlist([...watchlist, metric.stock_code]);
+      subscribe(metric.stock_code);
+    }
+  };
+
+  const formatNumber = (num: number) => num.toLocaleString("ko-KR");
+
+  const getChangeColor = (changeSign: string) => {
+    if (changeSign === "rise") return "text-light-danger-50";
+    if (changeSign === "fall") return "text-light-information-50";
+    return "text-light-gray-90";
+  };
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      {/* Hero Section */}
-      <div className="text-center mb-16">
-        <h1 className="text-5xl font-bold text-gray-900 mb-4">
-          <span className="text-blue-600">invest</span>Mate
-        </h1>
-        <p className="text-xl text-gray-600 mb-2">개인 투자자를 위한 종합 도구</p>
-        <p className="text-lg text-gray-500">어제의 분석, 오늘의 결정</p>
+    <div className="container mx-auto p-6">
+      {/* 헤더 */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-light-gray-90 mb-2">대시보드</h1>
+            <p className="text-light-gray-50">실시간 시세와 재무 지표를 한눈에</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${isConnected ? "bg-light-success-50" : "bg-light-danger-50"}`}></div>
+              <span className="text-sm text-light-gray-50">서버: {isConnected ? "연결됨" : "연결 안됨"}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${isKisConnected ? "bg-light-success-50" : "bg-light-warning-40"}`}></div>
+              <span className="text-sm text-light-gray-50">KIS: {isKisConnected ? "개장" : "폐장"}</span>
+            </div>
+          </div>
+        </div>
+
+        {realtimeError && (
+          <div className="mt-4 p-4 bg-light-warning-5 border border-light-warning-20 rounded-lg">
+            <p className="text-sm text-light-warning-80">{realtimeError}</p>
+          </div>
+        )}
       </div>
 
-      {/* Features Grid */}
-      <div className="grid md:grid-cols-3 gap-8 mb-12">
-        {features.map((feature) => (
-          <Link key={feature.href} href={feature.href} className="group block p-6 bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200">
-            <div className="text-4xl mb-4">{feature.icon}</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-blue-600">{feature.title}</h3>
-            <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-          </Link>
-        ))}
-      </div>
+      <div className="grid grid-cols-12 gap-6">
+        {/* 좌측: 워치리스트 */}
+        <div className="col-span-3 space-y-4">
+          {/* 종목 추가 */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">워치리스트</h2>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="종목코드 (예: 005930)"
+                value={stockCode}
+                onChange={(e) => setStockCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddStock()}
+                className="flex-1 border border-light-gray-30 rounded px-3 py-2 text-sm"
+                maxLength={6}
+              />
+              <button
+                onClick={handleAddStock}
+                disabled={!isConnected || !isKisConnected}
+                className="bg-light-primary-50 text-light-gray-0 px-3 py-2 rounded hover:bg-light-primary-60 transition-colors disabled:bg-light-gray-40 disabled:cursor-not-allowed text-sm"
+              >
+                추가
+              </button>
+            </div>
+          </div>
 
-      {/* User Journey */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">투자 여정</h2>
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-          <div className="text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-blue-600 font-bold">1</span>
-            </div>
-            <p className="font-semibold text-gray-900">발굴</p>
-            <p className="text-sm text-gray-600">스크리너에서 종목 탐색</p>
+          {/* 워치리스트 목록 */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4 max-h-[500px] overflow-y-auto">
+            {watchlist.length === 0 ? (
+              <div className="p-4 text-center text-light-gray-40 text-sm">종목을 추가해주세요</div>
+            ) : (
+              <div className="space-y-2">
+                {watchlist.map((code) => {
+                  const price = prices.get(code);
+                  const isSelected = selectedStockCode === code;
+                  const containerClass = isSelected ? "border-light-primary-50 bg-light-primary-5" : "border-light-gray-20 hover:bg-light-gray-5";
+                  return (
+                    <div key={code} onClick={() => handleSelectWatchlistStock(code)} className={`p-3 rounded-lg border cursor-pointer transition-colors ${containerClass}`}>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-semibold text-light-gray-90">{code}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveStock(code);
+                          }}
+                          className="text-light-danger-50 hover:text-light-danger-60 text-xs"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                      {price ? (
+                        <div className="mt-2 flex justify-between items-center">
+                          <span className="text-sm font-bold text-light-gray-90">{formatNumber(price.price)}원</span>
+                          <span className={`text-sm font-medium ${getChangeColor(price.changeSign)}`}>
+                            {price.changeSign === "rise" ? "+" : price.changeSign === "fall" ? "-" : ""}
+                            {Math.abs(price.changeRate).toFixed(2)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-light-gray-40 mt-1">대기 중...</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <div className="hidden md:block text-2xl text-gray-400">→</div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-green-600 font-bold">2</span>
-            </div>
-            <p className="font-semibold text-gray-900">확인</p>
-            <p className="text-sm text-gray-600">실시간 정보 미리보기</p>
+        </div>
+
+        {/* 중앙: 차트 영역 */}
+        <div className="col-span-5 space-y-4">
+          {/* 주가 차트 (캔들 + 실시간) */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">주가 차트 {selectedStockCode && `- ${selectedStockCode}`}</h2>
+            {selectedStockCode ? (
+              <div className="h-[300px]">
+                {candleLoading ? (
+                  <div className="h-full flex items-center justify-center text-light-gray-40">일봉 데이터 로딩 중...</div>
+                ) : (
+                  <StockPriceChart candleData={candleData} realtimeData={priceHistoryMap.get(selectedStockCode) || []} />
+                )}
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-light-gray-40">종목을 선택하세요</div>
+            )}
           </div>
-          <div className="hidden md:block text-2xl text-gray-400">→</div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-purple-600 font-bold">3</span>
-            </div>
-            <p className="font-semibold text-gray-900">편입</p>
-            <p className="text-sm text-gray-600">관심 종목에 추가</p>
+
+          {/* 재무 지표 차트 */}
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">재무 지표 {selectedMetric && `- ${selectedMetric.corp_name}`}</h2>
+            {historyLoading ? (
+              <div className="h-[200px] flex items-center justify-center text-light-gray-40">로딩 중...</div>
+            ) : selectedCorpCode && metricsHistory.length > 0 ? (
+              <div className="max-h-[700px] overflow-y-auto">
+                <FinancialMetricsChart data={metricsHistory} />
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-light-gray-40">스크리너에서 종목을 선택하세요</div>
+            )}
           </div>
-          <div className="hidden md:block text-2xl text-gray-400">→</div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
-              <span className="text-red-600 font-bold">4</span>
+        </div>
+
+        {/* 우측: 스크리너 */}
+        <div className="col-span-4">
+          <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-light-gray-90">스크리너</h2>
+              <span className="text-sm text-light-gray-40">{metricsLoading ? "로딩 중..." : `${latestMetrics.length}개 종목`}</span>
             </div>
-            <p className="font-semibold text-gray-900">감시</p>
-            <p className="text-sm text-gray-600">실시간 모니터링</p>
+
+            {metricsError && <div className="p-3 bg-light-danger-5 border border-light-danger-20 rounded text-light-danger-70 text-sm mb-4">{metricsError}</div>}
+
+            {/* 간단한 테이블 */}
+            <div className="overflow-y-auto max-h-[550px]">
+              <table className="w-full text-sm">
+                <thead className="bg-light-gray-5 sticky top-0">
+                  <tr>
+                    <th className="px-2 py-2 text-left text-light-gray-70">종목명</th>
+                    <th className="px-2 py-2 text-right text-light-gray-70">ROE</th>
+                    <th className="px-2 py-2 text-right text-light-gray-70">부채비율</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-light-gray-20">
+                  {latestMetrics.slice(0, 50).map((metric) => {
+                    const rowClass = selectedCorpCode === metric.corp_code ? "bg-light-primary-5" : "hover:bg-light-gray-5";
+                    return (
+                      <tr key={metric.corp_code} onClick={() => handleSelectScreenerStock(metric)} className={`cursor-pointer transition-colors ${rowClass}`}>
+                        <td className="px-2 py-2 text-light-gray-90">{metric.corp_name}</td>
+                        <td className="px-2 py-2 text-right text-light-gray-90">{metric.roe.toFixed(1)}%</td>
+                        <td className="px-2 py-2 text-right text-light-gray-90">{metric.debt_ratio.toFixed(1)}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
