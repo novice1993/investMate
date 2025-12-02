@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { jsonHttpClient } from "@/shared/lib/http";
 
 export interface FinancialMetricRow {
@@ -56,13 +56,13 @@ export function useFinancialMetrics() {
     enabled: params !== null,
   });
 
-  const search = (newParams: SearchParams = {}) => {
+  const search = useCallback((newParams: SearchParams = {}) => {
     setParams(newParams);
-  };
+  }, []);
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setParams(null);
-  };
+  }, []);
 
   return {
     metrics: data ?? [],
