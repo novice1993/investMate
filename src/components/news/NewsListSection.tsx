@@ -37,7 +37,7 @@ export function NewsListSection({ variant = "full", showHeader = true, showFilte
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">실시간 뉴스</h1>
-            <button onClick={fetchNewsData} disabled={loading} className="bg-green-500 hover:bg-green-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
+            <button onClick={() => fetchNewsData()} disabled={loading} className="bg-green-500 hover:bg-green-700 text-white font-medium py-2 px-4 rounded disabled:bg-gray-400 text-sm">
               {loading ? "로딩중..." : "새로고침"}
             </button>
           </div>
