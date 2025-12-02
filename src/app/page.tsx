@@ -5,7 +5,7 @@ import { useFinancialMetrics, type FinancialMetricRow } from "@/app/screener/use
 import { useMetricsHistory } from "@/app/screener/useMetricsHistory";
 import { useRealtimePrice } from "@/app/tracker/useRealtimePrice";
 import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
-import { RealtimePriceChart } from "@/components/charts/RealtimePriceChart";
+import { StockPriceChart } from "@/components/charts/StockPriceChart";
 import { RealtimePrice } from "@/core/entities/stock-price.entity";
 
 interface PriceHistory {
@@ -228,15 +228,15 @@ export default function HomePage() {
 
         {/* 중앙: 차트 영역 */}
         <div className="col-span-5 space-y-4">
-          {/* 실시간 가격 차트 */}
+          {/* 주가 차트 (캔들 + 실시간) */}
           <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
-            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">실시간 차트 {selectedStockCode && `- ${selectedStockCode}`}</h2>
+            <h2 className="text-lg font-semibold text-light-gray-90 mb-3">주가 차트 {selectedStockCode && `- ${selectedStockCode}`}</h2>
             {selectedStockCode ? (
-              <div className="h-[250px]">
-                <RealtimePriceChart data={priceHistoryMap.get(selectedStockCode) || []} />
+              <div className="h-[300px]">
+                <StockPriceChart candleData={[]} realtimeData={priceHistoryMap.get(selectedStockCode) || []} />
               </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-light-gray-40">종목을 선택하세요</div>
+              <div className="h-[300px] flex items-center justify-center text-light-gray-40">종목을 선택하세요</div>
             )}
           </div>
 
@@ -244,13 +244,13 @@ export default function HomePage() {
           <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4">
             <h2 className="text-lg font-semibold text-light-gray-90 mb-3">재무 지표 {selectedMetric && `- ${selectedMetric.corp_name}`}</h2>
             {historyLoading ? (
-              <div className="h-[250px] flex items-center justify-center text-light-gray-40">로딩 중...</div>
+              <div className="h-[200px] flex items-center justify-center text-light-gray-40">로딩 중...</div>
             ) : selectedCorpCode && metricsHistory.length > 0 ? (
-              <div className="h-[250px]">
+              <div className="max-h-[700px] overflow-y-auto">
                 <FinancialMetricsChart data={metricsHistory} />
               </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-light-gray-40">스크리너에서 종목을 선택하세요</div>
+              <div className="h-[200px] flex items-center justify-center text-light-gray-40">스크리너에서 종목을 선택하세요</div>
             )}
           </div>
         </div>
