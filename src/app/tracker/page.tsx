@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RealtimePriceChart } from "@/components/charts/RealtimePriceChart";
 import { RealtimePrice } from "@/core/entities/stock-price.entity";
-import { useRealtimePrice } from "@/hooks/useRealtimePrice";
+import { useRealtimePrice } from "./useRealtimePrice";
 
 interface PriceHistory {
   timestamp: string;
