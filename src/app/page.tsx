@@ -12,6 +12,7 @@ import { RealtimePrice } from "@/core/entities/stock-price.entity";
 interface PriceHistory {
   timestamp: string;
   price: number;
+  volume: number;
 }
 
 export default function HomePage() {
@@ -66,7 +67,7 @@ export default function HomePage() {
         setPriceHistoryMap((prev) => {
           const newMap = new Map(prev);
           const history = newMap.get(code) || [];
-          const newHistory = [...history, { timestamp: priceData.timestamp, price: priceData.price }].slice(-100);
+          const newHistory = [...history, { timestamp: priceData.timestamp, price: priceData.price, volume: priceData.volume }].slice(-100);
           newMap.set(code, newHistory);
           return newMap;
         });

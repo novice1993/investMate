@@ -3,6 +3,19 @@
 import ReactECharts from "echarts-for-react";
 import type { EChartsInstance } from "echarts-for-react";
 import { useMemo, useRef, useCallback } from "react";
+import { colorTokens } from "@/styles/tokens";
+
+// 디자인 토큰 기반 차트 색상
+const chartColors = {
+  rise: colorTokens["light-danger-50"], // 상승 (빨강)
+  fall: colorTokens["light-information-50"], // 하락 (파랑)
+  axisLine: colorTokens["light-gray-20"], // 축 라인
+  axisLabel: colorTokens["light-gray-50"], // 축 라벨
+  splitLine: colorTokens["light-gray-10"], // 분할선
+  border: colorTokens["light-gray-0"], // 테두리 (흰색)
+  neutral: colorTokens["light-gray-40"], // 중립
+  line: colorTokens["light-success-50"], // 실시간 라인
+};
 
 /**
  * 일봉 캔들 데이터 타입
@@ -13,6 +26,7 @@ export interface CandleData {
   high: number;
   low: number;
   close: number;
+  volume: number;
 }
 
 /**
@@ -21,6 +35,7 @@ export interface CandleData {
 export interface RealtimeData {
   timestamp: string;
   price: number;
+  volume: number;
 }
 
 interface StockPriceChartProps {
@@ -41,50 +56,54 @@ function formatDate(dateStr: string): string {
 }
 
 /**
- * 주가 차트 컴포넌트 (캔들스틱 + 실시간 점)
+ * 숫자를 축약형으로 변환 (1000000 → 1M)
+ */
+function formatVolume(value: number): string {
+  if (value >= 1000000) {
+    return (value / 1000000).toFixed(1) + "M";
+  }
+  if (value >= 1000) {
+    return (value / 1000).toFixed(0) + "K";
+  }
+  return value.toString();
+}
+
+/**
+ * 주가 차트 컴포넌트 (캔들스틱 + 거래량 + 실시간 점)
  */
 export function StockPriceChart({ candleData, realtimeData }: StockPriceChartProps) {
   const chartRef = useRef<EChartsInstance | null>(null);
-  const zoomStateRef = useRef<{ start: number; end: number } | null>(null);
-  const isInitializedRef = useRef(false);
+  const zoomStateRef = useRef<{ start: number; end: number }>({ start: 70, end: 100 });
 
   // 차트 인스턴스 저장 및 줌 이벤트 핸들러 등록
-  const onChartReady = useCallback(
-    (instance: EChartsInstance) => {
-      chartRef.current = instance;
+  const onChartReady = useCallback((instance: EChartsInstance) => {
+    chartRef.current = instance;
 
-      // dataZoom 이벤트 리스너 등록 (줌 상태 저장)
-      instance.on("datazoom", () => {
-        const option = instance.getOption() as { dataZoom?: { start?: number; end?: number }[] };
-        if (option.dataZoom && option.dataZoom[0]) {
-          zoomStateRef.current = {
-            start: option.dataZoom[0].start ?? 0,
-            end: option.dataZoom[0].end ?? 100,
-          };
-        }
-      });
-
-      // 최초 로드 시 기본 줌 설정 (최근 30%)
-      if (!isInitializedRef.current && candleData.length > 0) {
-        isInitializedRef.current = true;
-        zoomStateRef.current = { start: 70, end: 100 };
-        instance.dispatchAction({
-          type: "dataZoom",
-          start: 70,
-          end: 100,
-        });
+    // dataZoom 이벤트 리스너 등록 (줌 상태 저장)
+    instance.on("datazoom", () => {
+      const option = instance.getOption() as { dataZoom?: { start?: number; end?: number }[] };
+      if (option.dataZoom && option.dataZoom[0]) {
+        zoomStateRef.current = {
+          start: option.dataZoom[0].start ?? 0,
+          end: option.dataZoom[0].end ?? 100,
+        };
       }
-    },
-    [candleData.length]
-  );
+    });
+  }, []);
 
   const option = useMemo(() => {
     // 캔들 데이터 변환: [open, close, low, high]
     const candleDates = candleData.map((d) => formatDate(d.date));
     const candleValues = candleData.map((d) => [d.open, d.close, d.low, d.high]);
+    const volumeValues = candleData.map((d) => d.volume);
 
-    // 실시간 최신 가격 (마지막 값만 사용)
-    const latestRealtimePrice = realtimeData.length > 0 ? realtimeData[realtimeData.length - 1].price : null;
+    // 거래량 색상 (상승: 빨강, 하락: 파랑)
+    const volumeColors = candleData.map((d) => (d.close >= d.open ? chartColors.rise : chartColors.fall));
+
+    // 실시간 최신 데이터 (마지막 값만 사용)
+    const latestRealtime = realtimeData.length > 0 ? realtimeData[realtimeData.length - 1] : null;
+    const latestRealtimePrice = latestRealtime?.price ?? null;
+    const latestRealtimeVolume = latestRealtime?.volume ?? null;
 
     // 캔들 데이터가 있는 경우 (실시간 유무와 관계없이)
     if (candleData.length > 0) {
@@ -94,27 +113,43 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
       // 캔들스틱 데이터: 실시간이 있으면 마지막에 빈 값 추가 (캔들 영역 유지)
       const candleSeriesData = latestRealtimePrice !== null ? [...candleValues, ["-", "-", "-", "-"]] : candleValues;
 
-      // 실시간 점 데이터: 캔들 영역은 빈 값, 마지막에 현재가
-      const realtimeSeriesData = latestRealtimePrice !== null ? [...candleData.map(() => null), latestRealtimePrice] : [];
-
       // 전일 종가 (캔들 마지막 데이터의 close)
       const prevClose = candleData.length > 0 ? candleData[candleData.length - 1].close : null;
 
       // 등락 여부 판단 (상승: 빨강, 하락: 파랑)
       const isUp = prevClose !== null && latestRealtimePrice !== null ? latestRealtimePrice >= prevClose : true;
-      const realtimeColor = isUp ? "#ef4444" : "#3b82f6";
+      const realtimeColor = isUp ? chartColors.rise : chartColors.fall;
+
+      // 거래량 데이터: 실시간이 있으면 마지막에 실시간 누적 거래량 추가
+      const volumeSeriesData = latestRealtimeVolume !== null ? [...volumeValues, latestRealtimeVolume] : volumeValues;
+      const volumeColorData = latestRealtimeVolume !== null ? [...volumeColors, realtimeColor] : volumeColors;
+
+      // 실시간 점 데이터: 캔들 영역은 빈 값, 마지막에 현재가
+      const realtimeSeriesData = latestRealtimePrice !== null ? [...candleData.map(() => null), latestRealtimePrice] : [];
 
       const series: object[] = [
         {
           name: "일봉",
           type: "candlestick",
           data: candleSeriesData,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
           itemStyle: {
-            color: "#ef4444", // 상승 (빨강)
-            color0: "#3b82f6", // 하락 (파랑)
-            borderColor: "#ef4444",
-            borderColor0: "#3b82f6",
+            color: chartColors.rise,
+            color0: chartColors.fall,
+            borderColor: chartColors.rise,
+            borderColor0: chartColors.fall,
           },
+        },
+        {
+          name: "거래량",
+          type: "bar",
+          data: volumeSeriesData.map((v, i) => ({
+            value: v,
+            itemStyle: { color: volumeColorData[i] },
+          })),
+          xAxisIndex: 1,
+          yAxisIndex: 1,
         },
       ];
 
@@ -124,11 +159,13 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
           name: "현재가",
           type: "scatter",
           data: realtimeSeriesData,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
           symbol: "circle",
           symbolSize: 12,
           itemStyle: {
             color: realtimeColor,
-            borderColor: "#fff",
+            borderColor: chartColors.border,
             borderWidth: 2,
           },
           z: 10,
@@ -140,33 +177,71 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
           trigger: "axis",
           axisPointer: { type: "cross" },
         },
-        grid: {
-          left: "3%",
-          right: "3%",
-          top: "8%",
-          bottom: "12%",
-          containLabel: true,
-        },
-        xAxis: {
-          type: "category",
-          data: xAxisData,
-          axisLine: { lineStyle: { color: "#e5e7eb" } },
-          axisLabel: { color: "#6b7280" },
-        },
-        yAxis: {
-          type: "value",
-          scale: true,
-          axisLine: { lineStyle: { color: "#e5e7eb" } },
-          axisLabel: {
-            color: "#6b7280",
-            formatter: (value: number) => value.toLocaleString(),
+        grid: [
+          {
+            // 캔들차트 영역 (상단 70%)
+            left: "3%",
+            right: "3%",
+            top: "5%",
+            height: "60%",
+            containLabel: true,
           },
-          splitLine: { lineStyle: { color: "#f3f4f6" } },
-        },
+          {
+            // 거래량 영역 (하단 25%)
+            left: "3%",
+            right: "3%",
+            top: "72%",
+            height: "20%",
+            containLabel: true,
+          },
+        ],
+        xAxis: [
+          {
+            type: "category",
+            data: xAxisData,
+            gridIndex: 0,
+            axisLine: { lineStyle: { color: chartColors.axisLine } },
+            axisLabel: { show: false }, // 상단 차트는 라벨 숨김
+          },
+          {
+            type: "category",
+            data: xAxisData,
+            gridIndex: 1,
+            axisLine: { lineStyle: { color: chartColors.axisLine } },
+            axisLabel: { color: chartColors.axisLabel, fontSize: 10 },
+          },
+        ],
+        yAxis: [
+          {
+            type: "value",
+            scale: true,
+            gridIndex: 0,
+            axisLine: { lineStyle: { color: chartColors.axisLine } },
+            axisLabel: {
+              color: chartColors.axisLabel,
+              formatter: (value: number) => value.toLocaleString(),
+            },
+            splitLine: { lineStyle: { color: chartColors.splitLine } },
+          },
+          {
+            type: "value",
+            scale: true,
+            gridIndex: 1,
+            axisLine: { lineStyle: { color: chartColors.axisLine } },
+            axisLabel: {
+              color: chartColors.axisLabel,
+              fontSize: 10,
+              formatter: (value: number) => formatVolume(value),
+            },
+            splitLine: { lineStyle: { color: chartColors.splitLine } },
+          },
+        ],
         dataZoom: [
           {
-            type: "inside", // 마우스 스크롤로 줌
-            xAxisIndex: 0,
+            type: "inside",
+            xAxisIndex: [0, 1], // 두 x축 동시 줌
+            start: zoomStateRef.current.start,
+            end: zoomStateRef.current.end,
             zoomOnMouseWheel: true,
             moveOnMouseMove: true,
             moveOnMouseWheel: false,
@@ -205,18 +280,18 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
         xAxis: {
           type: "category",
           data: realtimeDates,
-          axisLine: { lineStyle: { color: "#e5e7eb" } },
-          axisLabel: { color: "#6b7280", rotate: 45 },
+          axisLine: { lineStyle: { color: chartColors.axisLine } },
+          axisLabel: { color: chartColors.axisLabel, rotate: 45 },
         },
         yAxis: {
           type: "value",
           scale: true,
-          axisLine: { lineStyle: { color: "#e5e7eb" } },
+          axisLine: { lineStyle: { color: chartColors.axisLine } },
           axisLabel: {
-            color: "#6b7280",
+            color: chartColors.axisLabel,
             formatter: (value: number) => value.toLocaleString(),
           },
-          splitLine: { lineStyle: { color: "#f3f4f6" } },
+          splitLine: { lineStyle: { color: chartColors.splitLine } },
         },
         series: [
           {
@@ -225,7 +300,7 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
             data: realtimeValues,
             smooth: true,
             symbol: "none",
-            lineStyle: { color: "#10b981", width: 2 },
+            lineStyle: { color: chartColors.line, width: 2 },
             areaStyle: {
               color: {
                 type: "linear",
@@ -234,8 +309,8 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
                 x2: 0,
                 y2: 1,
                 colorStops: [
-                  { offset: 0, color: "rgba(16, 185, 129, 0.3)" },
-                  { offset: 1, color: "rgba(16, 185, 129, 0.05)" },
+                  { offset: 0, color: `${chartColors.line}4D` }, // 30% opacity
+                  { offset: 1, color: `${chartColors.line}0D` }, // 5% opacity
                 ],
               },
             },
