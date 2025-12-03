@@ -33,6 +33,7 @@ async function fetchDailyPrices(stockCode: string): Promise<CandleData[]> {
     high: item.highPrice,
     low: item.lowPrice,
     close: item.closePrice,
+    volume: item.volume,
   }));
 }
 
