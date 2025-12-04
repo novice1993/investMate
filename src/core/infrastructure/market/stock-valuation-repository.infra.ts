@@ -1,0 +1,123 @@
+import { getSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
+
+/**
+ * @fileoverview 주식 밸류에이션 (PER/PBR/EPS/BPS) Supabase Repository
+ */
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface StockValuationRow {
+  id?: number;
+  stock_code: string;
+  corp_name: string;
+  per: number | null;
+  pbr: number | null;
+  eps: number | null;
+  bps: number | null;
+  current_price: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StockValuation {
+  stockCode: string;
+  corpName: string;
+  per: number | null;
+  pbr: number | null;
+  eps: number | null;
+  bps: number | null;
+  currentPrice: number | null;
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * 주식 밸류에이션 데이터를 저장합니다 (Upsert)
+ */
+export async function upsertStockValuation(valuation: StockValuation): Promise<void> {
+  const supabase = getSupabaseClient();
+  const row = mapToRow(valuation);
+
+  const { error } = await supabase.from("stock_valuation").upsert(row, {
+    onConflict: "stock_code",
+  });
+
+  if (error) {
+    console.error("[Stock Valuation Repository] 저장 오류:", error);
+    throw error;
+  }
+}
+
+/**
+ * 여러 주식 밸류에이션 데이터를 한 번에 저장합니다 (Bulk Upsert)
+ */
+export async function upsertBulkStockValuation(valuations: StockValuation[]): Promise<void> {
+  if (valuations.length === 0) {
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+  const rows = valuations.map(mapToRow);
+
+  const { error } = await supabase.from("stock_valuation").upsert(rows, {
+    onConflict: "stock_code",
+  });
+
+  if (error) {
+    console.error("[Stock Valuation Repository] 일괄 저장 오류:", error);
+    throw error;
+  }
+}
+
+/**
+ * 전체 밸류에이션 데이터를 Map으로 조회합니다 (스크리닝용)
+ */
+export async function getAllValuationMap(): Promise<Map<string, { per: number | null; pbr: number | null }>> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.from("stock_valuation").select("stock_code, per, pbr");
+
+  if (error) {
+    console.error("[Stock Valuation Repository] 조회 오류:", error);
+    throw error;
+  }
+
+  const map = new Map<string, { per: number | null; pbr: number | null }>();
+  for (const row of data || []) {
+    map.set(row.stock_code, { per: row.per, pbr: row.pbr });
+  }
+
+  return map;
+}
+
+// ============================================================================
+// Private Helpers
+// ============================================================================
+
+function mapToRow(valuation: StockValuation): Omit<StockValuationRow, "id" | "created_at" | "updated_at"> {
+  return {
+    stock_code: valuation.stockCode,
+    corp_name: valuation.corpName,
+    per: valuation.per,
+    pbr: valuation.pbr,
+    eps: valuation.eps,
+    bps: valuation.bps,
+    current_price: valuation.currentPrice,
+  };
+}
+
+function mapToEntity(row: StockValuationRow): StockValuation {
+  return {
+    stockCode: row.stock_code,
+    corpName: row.corp_name,
+    per: row.per,
+    pbr: row.pbr,
+    eps: row.eps,
+    bps: row.bps,
+    currentPrice: row.current_price,
+  };
+}

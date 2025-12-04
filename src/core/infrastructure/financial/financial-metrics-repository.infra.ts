@@ -201,6 +201,36 @@ export async function checkFinancialMetricsExists(corpCode: string, year: string
   return data !== null;
 }
 
+/**
+ * 최신 재무 지표를 조회합니다 (시그널 스크리닝용)
+ *
+ * @param year 연도
+ * @param quarter 분기 번호 (1-4)
+ * @returns 스크리닝용 재무 지표 배열
+ */
+export async function getLatestFinancialMetrics(
+  year: string,
+  quarter: number
+): Promise<{ corpCode: string; stockCode: string; corpName: string; roe: number; debtRatio: number; operatingMargin: number }[]> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.from("financial_metrics").select("corp_code, stock_code, corp_name, roe, debt_ratio, operating_margin").eq("year", year).eq("quarter", quarter);
+
+  if (error) {
+    console.error("[Financial Metrics Repository] 최신 지표 조회 오류:", error);
+    throw error;
+  }
+
+  return (data || []).map((row) => ({
+    corpCode: row.corp_code,
+    stockCode: row.stock_code,
+    corpName: row.corp_name,
+    roe: row.roe,
+    debtRatio: row.debt_ratio,
+    operatingMargin: row.operating_margin,
+  }));
+}
+
 // ============================================================================
 // Private Helpers
 // ============================================================================
