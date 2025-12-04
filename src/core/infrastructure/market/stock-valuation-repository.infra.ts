@@ -12,7 +12,6 @@ interface StockValuationRow {
   id?: number;
   stock_code: string;
   corp_name: string;
-  date: string;
   per: number | null;
   pbr: number | null;
   eps: number | null;
@@ -25,7 +24,6 @@ interface StockValuationRow {
 export interface StockValuation {
   stockCode: string;
   corpName: string;
-  date: string;
   per: number | null;
   pbr: number | null;
   eps: number | null;
@@ -45,7 +43,7 @@ export async function upsertStockValuation(valuation: StockValuation): Promise<v
   const row = mapToRow(valuation);
 
   const { error } = await supabase.from("stock_valuation").upsert(row, {
-    onConflict: "stock_code,date",
+    onConflict: "stock_code",
   });
 
   if (error) {
@@ -66,7 +64,7 @@ export async function upsertBulkStockValuation(valuations: StockValuation[]): Pr
   const rows = valuations.map(mapToRow);
 
   const { error } = await supabase.from("stock_valuation").upsert(rows, {
-    onConflict: "stock_code,date",
+    onConflict: "stock_code",
   });
 
   if (error) {
@@ -76,35 +74,24 @@ export async function upsertBulkStockValuation(valuations: StockValuation[]): Pr
 }
 
 /**
- * 특정 날짜의 전체 밸류에이션 데이터를 조회합니다
+ * 전체 밸류에이션 데이터를 Map으로 조회합니다 (스크리닝용)
  */
-export async function getStockValuationByDate(date: string): Promise<StockValuation[]> {
+export async function getAllValuationMap(): Promise<Map<string, { per: number | null; pbr: number | null }>> {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase.from("stock_valuation").select("*").eq("date", date);
+  const { data, error } = await supabase.from("stock_valuation").select("stock_code, per, pbr");
 
   if (error) {
     console.error("[Stock Valuation Repository] 조회 오류:", error);
     throw error;
   }
 
-  return (data || []).map(mapToEntity);
-}
-
-/**
- * 특정 종목의 최신 밸류에이션 데이터를 조회합니다
- */
-export async function getLatestStockValuation(stockCode: string): Promise<StockValuation | null> {
-  const supabase = getSupabaseClient();
-
-  const { data, error } = await supabase.from("stock_valuation").select("*").eq("stock_code", stockCode).order("date", { ascending: false }).limit(1).maybeSingle();
-
-  if (error) {
-    console.error("[Stock Valuation Repository] 조회 오류:", error);
-    throw error;
+  const map = new Map<string, { per: number | null; pbr: number | null }>();
+  for (const row of data || []) {
+    map.set(row.stock_code, { per: row.per, pbr: row.pbr });
   }
 
-  return data ? mapToEntity(data) : null;
+  return map;
 }
 
 // ============================================================================
@@ -115,7 +102,6 @@ function mapToRow(valuation: StockValuation): Omit<StockValuationRow, "id" | "cr
   return {
     stock_code: valuation.stockCode,
     corp_name: valuation.corpName,
-    date: valuation.date,
     per: valuation.per,
     pbr: valuation.pbr,
     eps: valuation.eps,
@@ -128,7 +114,6 @@ function mapToEntity(row: StockValuationRow): StockValuation {
   return {
     stockCode: row.stock_code,
     corpName: row.corp_name,
-    date: row.date,
     per: row.per,
     pbr: row.pbr,
     eps: row.eps,

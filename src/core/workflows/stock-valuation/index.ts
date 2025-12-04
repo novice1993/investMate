@@ -48,11 +48,8 @@ export async function runStockValuationWorkflow(): Promise<StockValuationWorkflo
     const corpMappings = await readKospiCorpMappingJson();
     console.log(`[Stock Valuation Workflow] Loaded ${corpMappings.length} companies`);
 
-    // 2. 오늘 날짜
-    const today = formatDate(new Date());
-
-    // 3. KIS API로 밸류에이션 데이터 수집 및 저장
-    const { savedCount, failedCount } = await fetchAndSaveValuations(corpMappings, today);
+    // 2. KIS API로 밸류에이션 데이터 수집 및 저장
+    const { savedCount, failedCount } = await fetchAndSaveValuations(corpMappings);
 
     console.log(`[Stock Valuation Workflow] Completed - Saved: ${savedCount}, Failed: ${failedCount}`);
 
@@ -89,7 +86,7 @@ export type { StockValuationWorkflowResult } from "./types";
 /**
  * KIS API로 밸류에이션 데이터를 수집하고 DB에 저장합니다.
  */
-async function fetchAndSaveValuations(corpMappings: Awaited<ReturnType<typeof readKospiCorpMappingJson>>, date: string): Promise<{ savedCount: number; failedCount: number }> {
+async function fetchAndSaveValuations(corpMappings: Awaited<ReturnType<typeof readKospiCorpMappingJson>>): Promise<{ savedCount: number; failedCount: number }> {
   let savedCount = 0;
   let failedCount = 0;
   let pendingValuations: StockValuation[] = [];
@@ -111,7 +108,6 @@ async function fetchAndSaveValuations(corpMappings: Awaited<ReturnType<typeof re
         return {
           stockCode: corp.stockCode,
           corpName: corp.corpName,
-          date,
           per: parseFloatOrNull(priceData.per),
           pbr: parseFloatOrNull(priceData.pbr),
           eps: parseFloatOrNull(priceData.eps),
@@ -155,16 +151,6 @@ async function fetchAndSaveValuations(corpMappings: Awaited<ReturnType<typeof re
   }
 
   return { savedCount, failedCount };
-}
-
-/**
- * 날짜를 YYYY-MM-DD 형식으로 포맷합니다.
- */
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 /**
