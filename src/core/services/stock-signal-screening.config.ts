@@ -11,6 +11,8 @@ export interface FundamentalConfig {
   minROE: number; // 최소 ROE (%)
   maxDebtRatio: number; // 최대 부채비율 (%)
   minOperatingMargin: number; // 최소 영업이익률 (%)
+  maxPER: number | null; // 최대 PER (null이면 필터 비활성화)
+  maxPBR: number | null; // 최대 PBR (null이면 필터 비활성화)
 }
 
 export interface TechnicalConfig {
@@ -38,18 +40,20 @@ export interface ScreeningConfig {
 export const SCREENING_CONFIG: ScreeningConfig = {
   fundamental: {
     enabled: true,
-    minROE: 10,
-    maxDebtRatio: 150,
-    minOperatingMargin: 5,
+    minROE: 5,
+    maxDebtRatio: 200,
+    minOperatingMargin: 3,
+    maxPER: 30,
+    maxPBR: 3.0,
   },
   technical: {
     enabled: true,
-    maxRSI: 35,
+    maxRSI: 50,
     rsiPeriod: 14,
-    goldenCrossEnabled: true,
+    goldenCrossEnabled: false,
     goldenCrossShortPeriod: 5,
     goldenCrossLongPeriod: 20,
-    volumeSpikeEnabled: true,
+    volumeSpikeEnabled: false,
     volumeSpikeThreshold: 2.0,
     volumeSpikePeriod: 20,
   },

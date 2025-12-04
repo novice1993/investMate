@@ -44,5 +44,6 @@ next-env.d.ts
 
 ## docs
 *.md
+!src/core/cron/SCHEDULE.md
 *.pdf
 

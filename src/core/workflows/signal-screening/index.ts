@@ -12,6 +12,7 @@
 import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-stream.infra";
 import { getLatestFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
 import { getPeriodStockPrice, toStockPriceEntities } from "@/core/infrastructure/market/kis-price.infra";
+import { getAllValuationMap } from "@/core/infrastructure/market/stock-valuation-repository.infra";
 import { getLatestConfirmedQuarter } from "@/core/services/financial-date.util";
 import { SCREENING_CONFIG } from "@/core/services/stock-signal-screening.config";
 import { preScreenByFundamentals, screenStocks } from "@/core/services/stock-signal-screening.service";
@@ -59,20 +60,24 @@ export async function runSignalScreeningWorkflow(): Promise<SignalScreeningWorkf
       return createErrorResult("No financial metrics found", startTime);
     }
 
-    // 3. 펀더멘털 1차 필터링 (일봉 조회 전 후보군 축소)
-    const candidateStockCodes = preScreenByFundamentals(corpMappings, financialMetrics, SCREENING_CONFIG);
+    // 3. 밸류에이션 데이터 조회 (PER/PBR)
+    const valuationMap = await getAllValuationMap();
+    console.log(`[Signal Screening Workflow] Fetched ${valuationMap.size} valuation data`);
+
+    // 4. 펀더멘털 1차 필터링 (일봉 조회 전 후보군 축소)
+    const candidateStockCodes = preScreenByFundamentals(corpMappings, financialMetrics, valuationMap, SCREENING_CONFIG);
     console.log(`[Signal Screening Workflow] Fundamental pre-screen: ${candidateStockCodes.length} candidates`);
 
     if (candidateStockCodes.length === 0) {
       return createSuccessResult(corpMappings.length, 0, 0, [], startTime);
     }
 
-    // 4. 일봉 데이터 조회 (KIS API - Rate Limit 고려)
+    // 5. 일봉 데이터 조회 (KIS API - Rate Limit 고려)
     const priceDataMap = await fetchPriceDataBatch(candidateStockCodes);
     console.log(`[Signal Screening Workflow] Fetched price data for ${priceDataMap.size} stocks`);
 
-    // 5. 최종 스크리닝 (펀더멘털 + 기술적 지표)
-    const screenedStocks = screenStocks(corpMappings, financialMetrics, priceDataMap, SCREENING_CONFIG);
+    // 6. 최종 스크리닝 (펀더멘털 + 기술적 지표)
+    const screenedStocks = screenStocks(corpMappings, financialMetrics, priceDataMap, valuationMap, SCREENING_CONFIG);
 
     console.log(`[Signal Screening Workflow] Final result: ${screenedStocks.length} stocks screened`);
 

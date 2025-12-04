@@ -52,10 +52,25 @@ export interface ScreenedStock {
 /**
  * 펀더멘털 조건을 평가합니다.
  */
-function evaluateFundamental(metrics: FinancialMetrics, config: ScreeningConfig): boolean {
-  const { minROE, maxDebtRatio, minOperatingMargin } = config.fundamental;
+function evaluateFundamental(metrics: FinancialMetrics, config: ScreeningConfig, valuation?: { per: number | null; pbr: number | null }): boolean {
+  const { minROE, maxDebtRatio, minOperatingMargin, maxPER, maxPBR } = config.fundamental;
 
-  return metrics.roe >= minROE && metrics.debtRatio <= maxDebtRatio && metrics.operatingMargin >= minOperatingMargin;
+  // 기본 펀더멘털 조건
+  if (metrics.roe < minROE || metrics.debtRatio > maxDebtRatio || metrics.operatingMargin < minOperatingMargin) {
+    return false;
+  }
+
+  // PER 필터 (null이면 비활성화, valuation 없으면 통과)
+  if (maxPER !== null && valuation?.per !== null && valuation?.per !== undefined) {
+    if (valuation.per > maxPER) return false;
+  }
+
+  // PBR 필터 (null이면 비활성화, valuation 없으면 통과)
+  if (maxPBR !== null && valuation?.pbr !== null && valuation?.pbr !== undefined) {
+    if (valuation.pbr > maxPBR) return false;
+  }
+
+  return true;
 }
 
 /**
@@ -107,9 +122,16 @@ function evaluateTechnical(
  * @param corpMappings KOSPI 기업 매핑 (시가총액 포함)
  * @param financialMetrics 재무 지표
  * @param priceDataMap 종목코드 → 일봉 데이터
+ * @param valuationMap 종목코드 → PER/PBR 데이터
  * @param config 스크리닝 설정
  */
-export function screenStocks(corpMappings: KospiCorpMapping[], financialMetrics: FinancialMetrics[], priceDataMap: Map<string, StockPrice[]>, config: ScreeningConfig): ScreenedStock[] {
+export function screenStocks(
+  corpMappings: KospiCorpMapping[],
+  financialMetrics: FinancialMetrics[],
+  priceDataMap: Map<string, StockPrice[]>,
+  valuationMap: Map<string, { per: number | null; pbr: number | null }>,
+  config: ScreeningConfig
+): ScreenedStock[] {
   // 시가총액/기업명 맵 생성
   const marketCapMap = new Map<string, number>();
   const corpNameMap = new Map<string, string>();
@@ -121,8 +143,9 @@ export function screenStocks(corpMappings: KospiCorpMapping[], financialMetrics:
   const results: ScreenedStock[] = [];
 
   for (const metrics of financialMetrics) {
-    // 1. 펀더멘털 필터링
-    if (config.fundamental.enabled && !evaluateFundamental(metrics, config)) {
+    // 1. 펀더멘털 필터링 (PER/PBR 포함)
+    const valuation = valuationMap.get(metrics.stockCode);
+    if (config.fundamental.enabled && !evaluateFundamental(metrics, config, valuation)) {
       continue;
     }
 
@@ -182,15 +205,23 @@ export function screenStocks(corpMappings: KospiCorpMapping[], financialMetrics:
  * 펀더멘털만으로 빠르게 1차 필터링합니다.
  * 일봉 데이터 조회 전 후보군을 줄이는 데 사용합니다.
  */
-export function preScreenByFundamentals(corpMappings: KospiCorpMapping[], financialMetrics: FinancialMetrics[], config: ScreeningConfig): string[] {
+export function preScreenByFundamentals(
+  corpMappings: KospiCorpMapping[],
+  financialMetrics: FinancialMetrics[],
+  valuationMap: Map<string, { per: number | null; pbr: number | null }>,
+  config: ScreeningConfig
+): string[] {
   // 시가총액 맵 생성
   const marketCapMap = new Map<string, number>();
   for (const corp of corpMappings) {
     marketCapMap.set(corp.stockCode, corp.marketCap);
   }
 
-  // 펀더멘털 필터링
-  const passed = financialMetrics.filter((m) => evaluateFundamental(m, config));
+  // 펀더멘털 필터링 (PER/PBR 포함)
+  const passed = financialMetrics.filter((m) => {
+    const valuation = valuationMap.get(m.stockCode);
+    return evaluateFundamental(m, config, valuation);
+  });
 
   // 시가총액 정렬
   const sorted = [...passed].sort((a, b) => {

@@ -6,7 +6,7 @@ const ENV_KEY = "ENABLE_KOSPI_MAPPING_SYNC_CRON";
 
 export const kospiMappingSyncJob = {
   name: "kospi-mapping-sync",
-  schedule: "55 5 * * *", // 매일 새벽 5시 55분
+  schedule: "55 5 * * 1-5", // 평일 새벽 5시 55분
 
   handler: async () => {
     // 0. 환경 변수로 실행 여부 확인
