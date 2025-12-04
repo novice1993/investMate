@@ -15,6 +15,8 @@ const chartColors = {
   border: colorTokens["light-gray-0"], // 테두리 (흰색)
   neutral: colorTokens["light-gray-40"], // 중립
   line: colorTokens["light-success-50"], // 실시간 라인
+  priceLine: colorTokens["light-primary-40"], // 종가 연결 라인
+  volumeLine: colorTokens["light-gray-50"], // 거래량 연결 라인
 };
 
 /**
@@ -127,6 +129,10 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
       // 실시간 점 데이터: 캔들 영역은 빈 값, 마지막에 현재가
       const realtimeSeriesData = latestRealtimePrice !== null ? [...candleData.map(() => null), latestRealtimePrice] : [];
 
+      // 종가 라인 데이터: 캔들 종가들 + 실시간 현재가
+      const closePrices = candleData.map((d) => d.close);
+      const priceLineData = latestRealtimePrice !== null ? [...closePrices, latestRealtimePrice] : closePrices;
+
       const series: object[] = [
         {
           name: "일봉",
@@ -142,6 +148,47 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
           },
         },
         {
+          name: "종가",
+          type: "line",
+          data: priceLineData,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          smooth: 0.3,
+          symbol: "none",
+          lineStyle: {
+            width: 2,
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 1,
+              y2: 0,
+              colorStops: [
+                { offset: 0, color: `${chartColors.priceLine}40` }, // 시작: 연하게
+                { offset: 0.7, color: `${chartColors.priceLine}AA` }, // 중간
+                { offset: 1, color: chartColors.priceLine }, // 끝: 진하게
+              ],
+            },
+            shadowColor: `${chartColors.priceLine}60`,
+            shadowBlur: 6,
+            shadowOffsetY: 3,
+          },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: `${chartColors.priceLine}25` },
+                { offset: 1, color: `${chartColors.priceLine}05` },
+              ],
+            },
+          },
+          z: 5,
+        },
+        {
           name: "거래량",
           type: "bar",
           data: volumeSeriesData.map((v, i) => ({
@@ -150,6 +197,21 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
           })),
           xAxisIndex: 1,
           yAxisIndex: 1,
+        },
+        {
+          name: "거래량 추이",
+          type: "line",
+          data: volumeSeriesData,
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: "none",
+          lineStyle: {
+            color: chartColors.volumeLine,
+            width: 1,
+            opacity: 0.6,
+          },
+          z: 5,
         },
       ];
 
