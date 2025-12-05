@@ -1,14 +1,12 @@
 import type { ScreenedStock } from "@/core/services/stock-signal-screening.service";
 
 /**
- * 시그널 스크리닝 워크플로우 결과
+ * 종목 스크리닝 워크플로우 결과
  */
 export interface SignalScreeningWorkflowResult {
   success: boolean;
   /** 전체 종목 수 */
   totalStocks: number;
-  /** 펀더멘털 통과 종목 수 */
-  fundamentalPassedCount: number;
   /** 최종 선별 종목 수 */
   screenedCount: number;
   /** 선별된 종목 목록 */
