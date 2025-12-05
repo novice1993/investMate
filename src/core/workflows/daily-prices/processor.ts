@@ -2,7 +2,7 @@
  * @fileoverview 일봉 데이터 배치 처리
  */
 
-import { replaceDailyPrices } from "@/core/infrastructure/market/daily-prices.repository";
+import { replaceDailyPrices } from "@/core/infrastructure/market/daily-prices-repository.infra";
 import { getPeriodStockPrice, toStockPriceEntities } from "@/core/infrastructure/market/kis-price.infra";
 
 /**

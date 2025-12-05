@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDailyPrices } from "@/core/infrastructure/market/daily-prices.repository";
+import { getDailyPrices } from "@/core/infrastructure/market/daily-prices-repository.infra";
 
 /**
  * 특정 종목의 일봉 데이터 조회 API

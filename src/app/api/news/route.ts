@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchNewsArticles } from "@/core/infrastructure/news/repository.infra";
+import { fetchNewsArticles } from "@/core/infrastructure/news/news-repository.infra";
 
 // 10분마다 자동 재검증 (Cron 수집 주기와 동일)
 export const revalidate = 600;
