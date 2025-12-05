@@ -185,6 +185,22 @@ export class KisWebSocketClient {
   }
 
   /**
+   * 여러 종목 일괄 구독 요청
+   */
+  subscribeMultiple(stockCodes: string[]): void {
+    if (!this.isConnected || !this.ws) {
+      console.error("[KIS WS] 연결되지 않았습니다.");
+      return;
+    }
+
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 시작`);
+    for (const stockCode of stockCodes) {
+      this.subscribe(stockCode);
+    }
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 완료`);
+  }
+
+  /**
    * 종목 실시간 시세 구독 요청
    */
   subscribe(stockCode: string): void {

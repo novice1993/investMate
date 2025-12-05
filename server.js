@@ -3,6 +3,7 @@ import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
+import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -16,15 +17,30 @@ const handle = app.getRequestHandler();
 const kisClient = new KisWebSocketClient();
 let isKisConnected = false;
 
+/**
+ * KIS WebSocket 연결 및 선별 종목 구독
+ */
+async function initKisWebSocket() {
+  console.log("[Server] KIS WebSocket 연결 시도...");
+  await kisClient.connect();
+  console.log("[Server] ✅ KIS WebSocket 연결 완료");
+
+  const stockCodes = await getScreenedStockCodes();
+  if (stockCodes.length > 0) {
+    console.log(`[Server] 선별 종목 ${stockCodes.length}개 자동 구독 시작...`);
+    kisClient.subscribeMultiple(stockCodes);
+  } else {
+    console.log("[Server] 선별 종목 없음. 자동 구독 건너뜀.");
+  }
+}
+
 app.prepare().then(async () => {
-  // KIS WebSocket 연결
+  // KIS WebSocket 연결 및 선별 종목 구독
   try {
-    console.log("[Server] KIS WebSocket 연결 시도...");
-    await kisClient.connect();
-    console.log("[Server] ✅ KIS WebSocket 연결 완료");
+    await initKisWebSocket();
     isKisConnected = true;
   } catch (error) {
-    console.error("[Server] ❌ KIS WebSocket 연결 실패:", error);
+    console.error("[Server] ❌ KIS WebSocket 초기화 실패:", error);
     console.error("[Server] ⚠️  실시간 시세 기능이 비활성화됩니다.");
     isKisConnected = false;
   }

@@ -1,27 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useFinancialMetrics, type FinancialMetricRow } from "@/app/screener/useFinancialMetrics";
 import { useMetricsHistory } from "@/app/screener/useMetricsHistory";
-import { useDailyPrices } from "@/app/tracker/useDailyPrices";
-import { useRealtimePrice } from "@/app/tracker/useRealtimePrice";
 import { FinancialMetricsChart } from "@/components/charts/FinancialMetricsChart";
-import { StockPriceChart } from "@/components/charts/StockPriceChart";
-import { RealtimePrice } from "@/core/entities/stock-price.entity";
-
-interface PriceHistory {
-  timestamp: string;
-  price: number;
-  volume: number;
-}
+import { StockChartCard } from "@/components/stock-chart";
+import { useRealtimePrice } from "@/components/stock-chart/useRealtimePrice";
 
 export default function HomePage() {
-  // 실시간 시세 관련
+  // 실시간 시세 관련 (워치리스트용)
   const { prices, subscribe, unsubscribe, isConnected, isKisConnected, error: realtimeError } = useRealtimePrice();
   const [stockCode, setStockCode] = useState("");
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [priceHistoryMap, setPriceHistoryMap] = useState<Map<string, PriceHistory[]>>(new Map());
-  const prevPricesRef = useRef<Map<string, RealtimePrice>>(new Map());
 
   // 스크리너 관련
   const { metrics, isLoading: metricsLoading, error: metricsError, search } = useFinancialMetrics();
@@ -32,9 +22,6 @@ export default function HomePage() {
 
   // 선택된 종목의 재무 히스토리
   const { history: metricsHistory, isLoading: historyLoading } = useMetricsHistory(selectedCorpCode);
-
-  // 선택된 종목의 일봉 데이터
-  const { candleData, isLoading: candleLoading } = useDailyPrices(selectedStockCode);
 
   // 스크리너에서 최신 분기만 표시
   const latestMetrics = useMemo(() => {
@@ -58,23 +45,6 @@ export default function HomePage() {
     if (!selectedCorpCode) return null;
     return metrics.find((m) => m.corp_code === selectedCorpCode) ?? null;
   }, [metrics, selectedCorpCode]);
-
-  // 실시간 가격 히스토리 업데이트
-  useEffect(() => {
-    prices.forEach((priceData, code) => {
-      const prevPrice = prevPricesRef.current.get(code);
-      if (!prevPrice || prevPrice.price !== priceData.price) {
-        setPriceHistoryMap((prev) => {
-          const newMap = new Map(prev);
-          const history = newMap.get(code) || [];
-          const newHistory = [...history, { timestamp: priceData.timestamp, price: priceData.price, volume: priceData.volume }].slice(-100);
-          newMap.set(code, newHistory);
-          return newMap;
-        });
-      }
-    });
-    prevPricesRef.current = new Map(prices);
-  }, [prices]);
 
   // 초기 스크리너 데이터 로드
   const searchCallback = useCallback(() => {
@@ -238,11 +208,7 @@ export default function HomePage() {
             <h2 className="text-lg font-semibold text-light-gray-90 mb-3">주가 차트 {selectedStockCode && `- ${selectedStockCode}`}</h2>
             {selectedStockCode ? (
               <div className="h-[300px]">
-                {candleLoading ? (
-                  <div className="h-full flex items-center justify-center text-light-gray-40">일봉 데이터 로딩 중...</div>
-                ) : (
-                  <StockPriceChart candleData={candleData} realtimeData={priceHistoryMap.get(selectedStockCode) || []} />
-                )}
+                <StockChartCard stockCode={selectedStockCode} />
               </div>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-light-gray-40">종목을 선택하세요</div>
