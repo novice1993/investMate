@@ -11,6 +11,7 @@
 
 import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-stream.infra";
 import { getLatestFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
+import { replaceScreenedStocks } from "@/core/infrastructure/market/screened-stocks-repository.infra";
 import { getAllValuationMap } from "@/core/infrastructure/market/stock-valuation-repository.infra";
 import { getLatestConfirmedQuarter } from "@/core/services/financial-date.util";
 import { SCREENING_CONFIG, screenStocks } from "@/core/services/stock-signal-screening.service";
@@ -51,7 +52,10 @@ export async function runSignalScreeningWorkflow(): Promise<SignalScreeningWorkf
     // 4. 스크리닝 (펀더멘털 + 밸류에이션)
     const screenedStocks = screenStocks(corpMappings, financialMetrics, valuationMap, SCREENING_CONFIG);
 
-    console.log(`[Stock Screening Workflow] Final result: ${screenedStocks.length} stocks screened`);
+    // 5. Supabase에 저장 (DELETE → INSERT)
+    await replaceScreenedStocks(screenedStocks);
+
+    console.log(`[Stock Screening Workflow] Final result: ${screenedStocks.length} stocks screened and saved`);
 
     return createSuccessResult(corpMappings.length, screenedStocks.length, screenedStocks, startTime);
   } catch (error) {
