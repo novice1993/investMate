@@ -62,7 +62,7 @@ export const SCREENING_CONFIG: ScreeningConfig = {
     maxPER: 30,
     maxPBR: 3.0,
   },
-  topN: 20,
+  topN: 40,
 };
 
 // ============================================================================

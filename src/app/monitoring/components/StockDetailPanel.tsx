@@ -1,0 +1,134 @@
+"use client";
+
+import { useMemo } from "react";
+import { StockChartCard } from "@/components/stock-chart";
+import type { RealtimePrice } from "@/core/entities/stock-price.entity";
+import type { ScreenedStock } from "../useScreenedStocks";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface StockDetailPanelProps {
+  stock: ScreenedStock;
+  realtimePrice?: RealtimePrice;
+  onClose: () => void;
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
+/**
+ * 종목 상세 패널
+ * - 캔들차트 + 실시간 가격
+ * - 펀더멘털 지표
+ * - 기술지표 상세
+ */
+export function StockDetailPanel({ stock, realtimePrice, onClose }: StockDetailPanelProps) {
+  // 가격 정보
+  const priceInfo = useMemo(() => {
+    if (!realtimePrice) {
+      return {
+        price: "-",
+        change: "-",
+        changeRate: "-",
+        changeSign: "flat" as const,
+      };
+    }
+
+    return {
+      price: realtimePrice.price.toLocaleString(),
+      change: realtimePrice.change > 0 ? `+${realtimePrice.change.toLocaleString()}` : realtimePrice.change.toLocaleString(),
+      changeRate: realtimePrice.changeRate > 0 ? `+${realtimePrice.changeRate.toFixed(2)}%` : `${realtimePrice.changeRate.toFixed(2)}%`,
+      changeSign: realtimePrice.changeSign,
+    };
+  }, [realtimePrice]);
+
+  // 등락 색상
+  const changeColorClass = useMemo(() => {
+    switch (priceInfo.changeSign) {
+      case "rise":
+        return "text-light-danger-50";
+      case "fall":
+        return "text-light-information-50";
+      default:
+        return "text-light-gray-50";
+    }
+  }, [priceInfo.changeSign]);
+
+  return (
+    <div className="bg-light-gray-0 rounded-lg border border-light-gray-20 p-4 sticky top-6">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-light-gray-90">{stock.corpName}</h2>
+          <p className="text-sm text-light-gray-50">{stock.stockCode}</p>
+        </div>
+        <button onClick={onClose} className="p-2 rounded-lg hover:bg-light-gray-5 transition-colors" aria-label="닫기">
+          <svg className="w-5 h-5 text-light-gray-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 가격 정보 */}
+      <div className="mb-4 p-3 bg-light-gray-5 rounded-lg">
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-light-gray-90">{priceInfo.price}</span>
+          <span className={`text-lg font-semibold ${changeColorClass}`}>{priceInfo.changeRate}</span>
+          {realtimePrice && <span className="w-2 h-2 rounded-full bg-light-success-50 animate-pulse" />}
+        </div>
+        <div className={`text-sm ${changeColorClass}`}>{priceInfo.change}</div>
+      </div>
+
+      {/* 차트 */}
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">주가 차트</h3>
+        <div className="h-[250px] border border-light-gray-10 rounded-lg overflow-hidden">
+          <StockChartCard stockCode={stock.stockCode} enableRealtime={true} />
+        </div>
+      </div>
+
+      {/* 펀더멘털 지표 */}
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <MetricCard label="ROE" value={`${stock.roe.toFixed(1)}%`} />
+          <MetricCard label="부채비율" value={`${stock.debtRatio.toFixed(1)}%`} />
+          <MetricCard label="영업이익률" value={`${stock.operatingMargin.toFixed(1)}%`} />
+        </div>
+      </div>
+
+      {/* 기술지표 (플레이스홀더) */}
+      <div>
+        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">기술적 지표</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <MetricCard label="RSI(14)" value="-" subLabel="계산 중" />
+          <MetricCard label="MA(5/20)" value="-" subLabel="계산 중" />
+          <MetricCard label="거래량" value="-" subLabel="계산 중" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Sub Components
+// ============================================================================
+
+interface MetricCardProps {
+  label: string;
+  value: string;
+  subLabel?: string;
+}
+
+function MetricCard({ label, value, subLabel }: MetricCardProps) {
+  return (
+    <div className="p-2 bg-light-gray-5 rounded-lg text-center">
+      <div className="text-xs text-light-gray-50 mb-1">{label}</div>
+      <div className="text-sm font-semibold text-light-gray-90">{value}</div>
+      {subLabel && <div className="text-xs text-light-gray-40">{subLabel}</div>}
+    </div>
+  );
+}
