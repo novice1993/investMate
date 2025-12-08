@@ -1,4 +1,4 @@
-import { initializeGeminiClient } from "@/core/infrastructure/common/llm.infra";
+import { initializeLLMClient } from "@/core/infrastructure/common/llm.infra";
 import { initializeSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
 import { getOrRefreshKisToken, getOrRefreshApprovalKey } from "@/core/infrastructure/market/kis-auth.infra";
 import { setCache, clearCache } from "@/shared/lib/utils/cache";
@@ -39,13 +39,13 @@ export async function initializeKisApprovalKey() {
 }
 
 /**
- * Gemini AI 인스턴스를 생성하는 초기화 함수
+ * LLM 클라이언트를 생성하는 초기화 함수 (현재: Groq)
  */
-export async function initializeGemini() {
+export async function initializeLLM() {
   try {
-    initializeGeminiClient();
+    initializeLLMClient();
   } catch (error) {
-    console.error("Error during Gemini initialization:", error);
+    console.error("Error during LLM initialization:", error);
     throw error;
   }
 }
