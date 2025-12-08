@@ -37,6 +37,7 @@
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.5",
     "fast-xml-parser": "^5.2.5",
+    "groq-sdk": "^0.37.0",
     "iconv-lite": "^0.6.3",
     "next": "15.4.2",
     "node-cron": "^4.2.1",

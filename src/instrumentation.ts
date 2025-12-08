@@ -1,4 +1,4 @@
-import { initializeKisAccessToken, initializeKisApprovalKey, initializeGemini, initializeSupabase } from "@/core/services/initialization.service";
+import { initializeKisAccessToken, initializeKisApprovalKey, initializeLLM, initializeSupabase } from "@/core/services/initialization.service";
 import { initializeLastRunTime } from "./core/services/news-execution-tracker.service";
 
 export async function register() {
@@ -8,7 +8,7 @@ export async function register() {
 
     try {
       await initializeSupabase();
-      await initializeGemini();
+      await initializeLLM();
       await initializeKisAccessToken();
       await initializeKisApprovalKey();
       initializeLastRunTime(); // 뉴스 수집 마지막 실행 시간 초기화
