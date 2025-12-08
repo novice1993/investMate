@@ -8,6 +8,7 @@
 
 import { FinancialStatement } from "@/core/entities/financial.entity";
 import { fetchMultipleFinancialStatements } from "@/core/infrastructure/financial/dart-financial.infra";
+import { getQuarterFromMonth, getPreviousQuarter } from "@/core/services/financial-date.util";
 
 // ============================================================================
 // Constants
@@ -82,7 +83,7 @@ export function getLatestAvailableQuarter(): {
   const currentQuarter = getQuarterFromMonth(month);
 
   // 이전 분기 계산 (Q1의 이전은 전년도 Q4)
-  const { year: targetYear, quarter: targetQuarterNum } = getPreviousQuarterYearAndNumber(currentYear, currentQuarter);
+  const { year: targetYear, quarter: targetQuarterNum } = getPreviousQuarter(currentYear, currentQuarter);
 
   // 분기 번호 → DART 분기 코드 변환
   const quarterCode = QUARTER_CODE_MAP[targetQuarterNum];
@@ -139,33 +140,6 @@ export async function fetchFinancialDataWithFallback(corpCodes: string[], year: 
 // ============================================================================
 // Private Helpers
 // ============================================================================
-
-/**
- * 월(month)로부터 분기 번호를 계산합니다.
- *
- * @param month 월 (1-12)
- * @returns 분기 번호 (1-4)
- */
-function getQuarterFromMonth(month: number): number {
-  if (month >= 1 && month <= 3) return 1;
-  if (month >= 4 && month <= 6) return 2;
-  if (month >= 7 && month <= 9) return 3;
-  return 4;
-}
-
-/**
- * 현재 분기의 이전 분기 연도와 번호를 계산합니다.
- *
- * @param currentYear 현재 연도
- * @param currentQuarter 현재 분기 번호 (1-4)
- * @returns 이전 분기 연도 및 번호
- */
-function getPreviousQuarterYearAndNumber(currentYear: number, currentQuarter: number): { year: number; quarter: number } {
-  if (currentQuarter === 1) {
-    return { year: currentYear - 1, quarter: 4 };
-  }
-  return { year: currentYear, quarter: currentQuarter - 1 };
-}
 
 /**
  * 초기 재무 데이터를 조회합니다 (current, previous, previousYearQ4).

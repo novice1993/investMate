@@ -4,7 +4,7 @@
  */
 
 import { NewsArticle } from "@/core/entities/news.entity";
-import { checkArticlesExistBatch, insertNewsArticles } from "@/core/infrastructure/news/repository.infra";
+import { checkArticlesExistBatch, insertNewsArticles } from "@/core/infrastructure/news/news-repository.infra";
 import { fetchMKSitemap } from "@/core/infrastructure/news/sitemap.infra";
 import { getLastRunTime, updateLastRunTime, filterArticlesSinceLastRun } from "@/core/services/news-execution-tracker.service";
 import { parseMKSitemap } from "@/core/services/news-parser.service";

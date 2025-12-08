@@ -3,6 +3,9 @@ import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
+import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
+import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
+import { detectSignalTriggers, SIGNAL_TRIGGER_CONFIG } from "./src/core/services/signal-trigger.service.ts";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -16,15 +19,169 @@ const handle = app.getRequestHandler();
 const kisClient = new KisWebSocketClient();
 let isKisConnected = false;
 
+// ============================================================================
+// Signal State Management
+// ============================================================================
+
+/**
+ * 종목별 시그널 상태 저장
+ * @type {Map<string, { rsiOversold: boolean, goldenCross: boolean, volumeSpike: boolean }>}
+ */
+const signalState = new Map();
+
+/**
+ * 히스테리시스를 적용하여 시그널 상태를 업데이트하고, 새로 발생한 시그널만 반환
+ *
+ * - RSI: 30 이하 진입 → 35 이상 해제
+ * - 거래량: 2.0배 이상 진입 → 1.5배 이하 해제
+ * - 골든크로스: 교차 순간만 감지 (히스테리시스 불필요)
+ *
+ * @param {string} stockCode
+ * @param {object} signalResult - detectSignalTriggers 결과
+ * @returns {{ rsiOversold: boolean, goldenCross: boolean, volumeSpike: boolean } | null} 새로 발생한 시그널 (없으면 null)
+ */
+function updateSignalStateAndGetChanges(stockCode, signalResult) {
+  const prevState = signalState.get(stockCode);
+  const defaultState = {
+    rsiOversold: false,
+    goldenCross: false,
+    volumeSpike: false,
+  };
+  const prev = prevState || defaultState;
+
+  // RSI 히스테리시스 적용
+  const rsiValue = signalResult.rsi?.latest;
+  let newRsiOversold;
+  if (prev.rsiOversold) {
+    // 이미 과매도 상태 → 35 이상이어야 해제
+    newRsiOversold = rsiValue !== null && rsiValue < SIGNAL_TRIGGER_CONFIG.rsi.recoveryThreshold;
+  } else {
+    // 정상 상태 → 30 이하여야 진입
+    newRsiOversold = rsiValue !== null && rsiValue <= SIGNAL_TRIGGER_CONFIG.rsi.oversoldThreshold;
+  }
+
+  // 거래량 스파이크 히스테리시스 적용
+  const volumeRatio = signalResult.volumeSpike?.ratio ?? 0;
+  let newVolumeSpike;
+  if (prev.volumeSpike) {
+    // 이미 급등 상태 → 1.5배 이하여야 해제
+    newVolumeSpike = volumeRatio > SIGNAL_TRIGGER_CONFIG.volumeSpike.recoveryThreshold;
+  } else {
+    // 정상 상태 → 2.0배 이상이어야 진입
+    newVolumeSpike = volumeRatio >= SIGNAL_TRIGGER_CONFIG.volumeSpike.threshold;
+  }
+
+  // 골든크로스는 교차 순간만 감지 (히스테리시스 불필요)
+  const newGoldenCross = signalResult.triggers.goldenCross;
+
+  const newState = {
+    rsiOversold: newRsiOversold,
+    goldenCross: newGoldenCross,
+    volumeSpike: newVolumeSpike,
+  };
+
+  // 새로 발생한 시그널 감지 (false → true 전이)
+  const changedTriggers = {
+    rsiOversold: !prev.rsiOversold && newState.rsiOversold,
+    goldenCross: !prev.goldenCross && newState.goldenCross,
+    volumeSpike: !prev.volumeSpike && newState.volumeSpike,
+  };
+
+  // 상태 업데이트
+  signalState.set(stockCode, newState);
+
+  // 새로 발생한 시그널이 있는지 확인
+  const hasNewTrigger = changedTriggers.rsiOversold || changedTriggers.goldenCross || changedTriggers.volumeSpike;
+
+  return hasNewTrigger ? changedTriggers : null;
+}
+
+/**
+ * 가격 캐시 초기화 (일봉 데이터 메모리 로딩)
+ */
+async function initPriceCache() {
+  console.log("[Server] 가격 캐시 초기화 시작...");
+  await initializePriceCache();
+  console.log("[Server] ✅ 가격 캐시 초기화 완료");
+}
+
+/**
+ * 서버 시작 시 일봉 데이터 기반으로 초기 시그널 상태 계산
+ * 이후 실시간 체결가 수신 시 상태 전이만 감지
+ */
+function initializeSignalState() {
+  console.log("[Server] 초기 시그널 상태 계산 시작...");
+
+  const stockCodes = getCachedStockCodes();
+  let signalCount = 0;
+
+  for (const stockCode of stockCodes) {
+    const priceData = getPriceDataForSignal(stockCode);
+    if (!priceData || priceData.length < 20) continue;
+
+    const signalResult = detectSignalTriggers(stockCode, priceData, SIGNAL_TRIGGER_CONFIG);
+
+    // 초기 상태 계산 (히스테리시스 진입 조건 기준)
+    const rsiValue = signalResult.rsi?.latest;
+    const volumeRatio = signalResult.volumeSpike?.ratio ?? 0;
+
+    const initialState = {
+      rsiOversold: rsiValue !== null && rsiValue <= SIGNAL_TRIGGER_CONFIG.rsi.oversoldThreshold,
+      goldenCross: signalResult.triggers.goldenCross,
+      volumeSpike: volumeRatio >= SIGNAL_TRIGGER_CONFIG.volumeSpike.threshold,
+    };
+
+    signalState.set(stockCode, initialState);
+
+    const hasAnyTrigger = initialState.rsiOversold || initialState.goldenCross || initialState.volumeSpike;
+    if (hasAnyTrigger) {
+      signalCount++;
+      console.log(`[Signal Init] ${stockCode}:`, initialState);
+    }
+  }
+
+  console.log(`[Server] ✅ 초기 시그널 상태 계산 완료: ${signalCount}개 종목에서 시그널 감지`);
+}
+
+/**
+ * KIS WebSocket 연결 및 선별 종목 구독
+ */
+async function initKisWebSocket() {
+  console.log("[Server] KIS WebSocket 연결 시도...");
+  await kisClient.connect();
+  console.log("[Server] ✅ KIS WebSocket 연결 완료");
+
+  const stockCodes = await getScreenedStockCodes();
+  if (stockCodes.length > 0) {
+    console.log(`[Server] 선별 종목 ${stockCodes.length}개 자동 구독 시작...`);
+    kisClient.subscribeMultiple(stockCodes);
+  } else {
+    console.log("[Server] 선별 종목 없음. 자동 구독 건너뜀.");
+  }
+}
+
 app.prepare().then(async () => {
-  // KIS WebSocket 연결
+  // 1. 가격 캐시 초기화 (일봉 데이터)
   try {
-    console.log("[Server] KIS WebSocket 연결 시도...");
-    await kisClient.connect();
-    console.log("[Server] ✅ KIS WebSocket 연결 완료");
+    await initPriceCache();
+  } catch (error) {
+    console.error("[Server] ❌ 가격 캐시 초기화 실패:", error);
+    console.error("[Server] ⚠️  시그널 알림 기능이 비활성화됩니다.");
+  }
+
+  // 2. 초기 시그널 상태 계산 (일봉 기준)
+  try {
+    initializeSignalState();
+  } catch (error) {
+    console.error("[Server] ❌ 초기 시그널 계산 실패:", error);
+  }
+
+  // 3. KIS WebSocket 연결 및 선별 종목 구독
+  try {
+    await initKisWebSocket();
     isKisConnected = true;
   } catch (error) {
-    console.error("[Server] ❌ KIS WebSocket 연결 실패:", error);
+    console.error("[Server] ❌ KIS WebSocket 초기화 실패:", error);
     console.error("[Server] ⚠️  실시간 시세 기능이 비활성화됩니다.");
     isKisConnected = false;
   }
@@ -48,11 +205,36 @@ app.prepare().then(async () => {
     },
   });
 
-  // KIS WebSocket 데이터 수신 → Socket.io로 브로드캐스트
+  // KIS WebSocket 데이터 수신 → 시그널 체크 + Socket.io 브로드캐스트
   kisClient.onDataReceived = (data) => {
-    // 실시간 데이터를 해당 종목을 구독 중인 클라이언트들에게 전송
-    if (data.stockCode) {
-      io.to(`stock:${data.stockCode}`).emit("price-update", data);
+    if (!data.stockCode) return;
+
+    // 1. 실시간 데이터를 해당 종목 구독 클라이언트들에게 전송
+    io.to(`stock:${data.stockCode}`).emit("price-update", data);
+
+    // 2. 실시간 데이터를 캐시에 반영
+    updateRealtimePrice(data);
+
+    // 3. 시그널 트리거 체크
+    const priceData = getPriceDataForSignal(data.stockCode);
+    if (!priceData || priceData.length < 20) return;
+
+    const signalResult = detectSignalTriggers(data.stockCode, priceData, SIGNAL_TRIGGER_CONFIG);
+
+    // 4. 히스테리시스 적용하여 상태 변경 감지
+    const changedTriggers = updateSignalStateAndGetChanges(data.stockCode, signalResult);
+
+    // 5. 새로 발생한 시그널이 있을 때만 알림
+    if (changedTriggers) {
+      console.log(`[Signal] ${data.stockCode} 새 시그널:`, changedTriggers);
+      io.emit("signal-alert", {
+        stockCode: data.stockCode,
+        triggers: changedTriggers,
+        rsi: signalResult.rsi,
+        crossover: signalResult.crossover,
+        volumeSpike: signalResult.volumeSpike,
+        timestamp: new Date().toISOString(),
+      });
     }
   };
 
@@ -75,6 +257,10 @@ app.prepare().then(async () => {
 
     // KIS 연결 상태를 클라이언트에 전달
     socket.emit("kis-status", { connected: isKisConnected });
+
+    // 현재 시그널 상태 일괄 전송 (클라이언트 초기화용)
+    const currentSignals = Object.fromEntries(signalState);
+    socket.emit("signal-state-init", currentSignals);
 
     // 프론트엔드 구독 요청 → KIS에 구독 전달
     socket.on("subscribe", ({ stockCode }) => {

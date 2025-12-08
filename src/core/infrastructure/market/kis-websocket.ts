@@ -111,8 +111,6 @@ export class KisWebSocketClient {
         return;
       }
 
-      console.log("[KIS WS] 메시지 수신:", message.substring(0, 100)); // 앞 100자만 로그
-
       // 메시지 파싱하고 콜백 호출
       const parsed = this.parseMessage(message);
       if (parsed && this.onDataReceived) {
@@ -182,6 +180,22 @@ export class KisWebSocketClient {
       console.error("[KIS WS] 파싱 에러:", error);
       return null;
     }
+  }
+
+  /**
+   * 여러 종목 일괄 구독 요청
+   */
+  subscribeMultiple(stockCodes: string[]): void {
+    if (!this.isConnected || !this.ws) {
+      console.error("[KIS WS] 연결되지 않았습니다.");
+      return;
+    }
+
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 시작`);
+    for (const stockCode of stockCodes) {
+      this.subscribe(stockCode);
+    }
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 완료`);
   }
 
   /**

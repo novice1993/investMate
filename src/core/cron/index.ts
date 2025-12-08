@@ -3,6 +3,8 @@ import { dailyPricesJob } from "./jobs/daily-prices.job";
 import { financialMetricsJob } from "./jobs/financial-metrics.job";
 import { kospiMappingSyncJob } from "./jobs/kospi-mapping-sync.job";
 import { newsCollectionJob } from "./jobs/news-collection.job";
+import { signalScreeningJob } from "./jobs/signal-screening.job";
+import { stockValuationJob } from "./jobs/stock-valuation.job";
 import { registerCronJob } from "./utils/register";
 
 const scheduledJobs: Map<string, ScheduledTask> = new Map();
@@ -23,7 +25,9 @@ export function initializeCronJobs() {
   registerCronJob(kospiMappingSyncJob, scheduledJobs);
   registerCronJob(newsCollectionJob, scheduledJobs);
   registerCronJob(financialMetricsJob, scheduledJobs);
+  registerCronJob(stockValuationJob, scheduledJobs);
   registerCronJob(dailyPricesJob, scheduledJobs);
+  registerCronJob(signalScreeningJob, scheduledJobs);
 
   console.log("[Cron] All jobs initialized successfully");
 }

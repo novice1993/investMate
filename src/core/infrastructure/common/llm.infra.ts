@@ -51,8 +51,10 @@ export function getGeminiClient(): GoogleGenAI {
 
 /**
  * 기본 LLM 모델
+ * - gemma-3-27b: RPD 14,400 (무료 티어 여유로움)
+ * - gemini-2.5-flash-lite: RPD 20 (무료 티어 제한 심함)
  */
-export const DEFAULT_LLM_MODEL = "gemini-2.5-flash-lite";
+export const DEFAULT_LLM_MODEL = "gemma-3-27b";
 
 /**
  * Generates text using the configured LLM.

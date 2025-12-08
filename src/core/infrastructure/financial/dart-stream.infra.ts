@@ -11,6 +11,7 @@ export interface KospiCorpMapping {
   corpName: string;
   stockCode: string;
   market: "KOSPI";
+  marketCap: number; // 시가총액 (원)
   generatedAt: string;
 }
 
@@ -40,9 +41,10 @@ export async function readKospiCorpMappingJson(): Promise<KospiCorpMapping[]> {
  *
  * @param targetStockCodes 필터링할 종목코드 Set
  * @param outputPath 출력 JSON 파일 경로
+ * @param marketCapMap 종목코드 → 시가총액 맵 (KRX 데이터)
  * @returns 매칭된 기업 수
  */
-export async function streamDartCorpToJson(targetStockCodes: Set<string>, outputPath: string): Promise<{ count: number }> {
+export async function streamDartCorpToJson(targetStockCodes: Set<string>, outputPath: string, marketCapMap: Map<string, number> = new Map()): Promise<{ count: number }> {
   if (!DART_APP_KEY) {
     throw new Error("DART_APP_KEY not set");
   }
@@ -108,6 +110,7 @@ export async function streamDartCorpToJson(targetStockCodes: Set<string>, output
           corpName: currentItem.corp_name || "",
           stockCode: currentItem.stock_code || "",
           market: "KOSPI",
+          marketCap: marketCapMap.get(stockCode) || 0,
           generatedAt: new Date().toISOString(),
         };
 

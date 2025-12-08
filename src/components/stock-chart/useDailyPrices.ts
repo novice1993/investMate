@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { CandleData } from "@/components/charts/StockPriceChart";
 import { jsonHttpClient } from "@/shared/lib/http";
+import type { CandleData } from "./StockPriceChart";
 
 interface DailyPriceApiResponse {
   success: boolean;
@@ -33,6 +33,7 @@ async function fetchDailyPrices(stockCode: string): Promise<CandleData[]> {
     high: item.highPrice,
     low: item.lowPrice,
     close: item.closePrice,
+    volume: item.volume,
   }));
 }
 
