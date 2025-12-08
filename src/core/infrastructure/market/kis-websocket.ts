@@ -111,8 +111,6 @@ export class KisWebSocketClient {
         return;
       }
 
-      console.log("[KIS WS] 메시지 수신:", message.substring(0, 100)); // 앞 100자만 로그
-
       // 메시지 파싱하고 콜백 호출
       const parsed = this.parseMessage(message);
       if (parsed && this.onDataReceived) {

@@ -15,7 +15,8 @@ export interface SignalTriggerConfig {
   rsi: {
     enabled: boolean;
     period: number;
-    oversoldThreshold: number; // 과매도 기준 (이하면 시그널)
+    oversoldThreshold: number; // 과매도 진입 기준 (이하면 시그널)
+    recoveryThreshold: number; // 과매도 해제 기준 (이상이면 해제)
   };
   goldenCross: {
     enabled: boolean;
@@ -25,7 +26,8 @@ export interface SignalTriggerConfig {
   volumeSpike: {
     enabled: boolean;
     period: number;
-    threshold: number; // 평균 대비 배수
+    threshold: number; // 진입 기준 (평균 대비 배수)
+    recoveryThreshold: number; // 해제 기준 (이하면 해제)
   };
 }
 
@@ -50,7 +52,8 @@ export const SIGNAL_TRIGGER_CONFIG: SignalTriggerConfig = {
   rsi: {
     enabled: true,
     period: 14,
-    oversoldThreshold: 30,
+    oversoldThreshold: 30, // RSI ≤ 30 이면 과매도 진입
+    recoveryThreshold: 35, // RSI ≥ 35 이면 과매도 해제
   },
   goldenCross: {
     enabled: true,
@@ -60,7 +63,8 @@ export const SIGNAL_TRIGGER_CONFIG: SignalTriggerConfig = {
   volumeSpike: {
     enabled: true,
     period: 20,
-    threshold: 2.0,
+    threshold: 2.0, // 평균 대비 2배 이상이면 급등 진입
+    recoveryThreshold: 1.5, // 평균 대비 1.5배 이하면 급등 해제
   },
 };
 
