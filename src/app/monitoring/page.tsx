@@ -5,6 +5,7 @@ import { useRealtimePrice } from "@/components/stock-chart/useRealtimePrice";
 import { MonitoringStockCard } from "./components/MonitoringStockCard";
 import { StockDetailPanel } from "./components/StockDetailPanel";
 import { useScreenedStocks, type ScreenedStock } from "./useScreenedStocks";
+import { useSignalAlert } from "./useSignalAlert";
 
 // ============================================================================
 // Types
@@ -23,18 +24,35 @@ export default function MonitoringPage() {
   // 실시간 가격 데이터
   const { prices, isConnected, isKisConnected } = useRealtimePrice();
 
+  // 시그널 알림 데이터
+  const { signals, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert();
+
   // 선택된 종목 (상세 패널용)
   const [selectedStock, setSelectedStock] = useState<ScreenedStock | null>(null);
 
   // 필터 상태
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
-  // TODO: 기술지표 기반 필터링 (추후 구현)
+  // 시그널 기반 필터링
   const filteredStocks = useMemo(() => {
     if (activeFilter === "all") return stocks;
-    // 추후 RSI, 골든크로스, 거래량 급등 필터 구현
-    return stocks;
-  }, [stocks, activeFilter]);
+
+    return stocks.filter((stock) => {
+      const signal = signals.get(stock.stockCode);
+      if (!signal) return false;
+
+      switch (activeFilter) {
+        case "rsi":
+          return signal.rsiOversold;
+        case "golden":
+          return signal.goldenCross;
+        case "volume":
+          return signal.volumeSpike;
+        default:
+          return true;
+      }
+    });
+  }, [stocks, activeFilter, signals]);
 
   // 연결 상태 표시
   const connectionStatus = useMemo(() => {
@@ -64,13 +82,13 @@ export default function MonitoringPage() {
         <FilterTab active={activeFilter === "all"} onClick={() => setActiveFilter("all")}>
           전체 ({stocks.length})
         </FilterTab>
-        <FilterTab active={activeFilter === "rsi"} onClick={() => setActiveFilter("rsi")} badge="0" badgeColor="danger">
+        <FilterTab active={activeFilter === "rsi"} onClick={() => setActiveFilter("rsi")} badge={String(rsiCount)} badgeColor="danger">
           RSI 과매도
         </FilterTab>
-        <FilterTab active={activeFilter === "golden"} onClick={() => setActiveFilter("golden")} badge="0" badgeColor="success">
+        <FilterTab active={activeFilter === "golden"} onClick={() => setActiveFilter("golden")} badge={String(goldenCrossCount)} badgeColor="success">
           골든크로스
         </FilterTab>
-        <FilterTab active={activeFilter === "volume"} onClick={() => setActiveFilter("volume")} badge="0" badgeColor="warning">
+        <FilterTab active={activeFilter === "volume"} onClick={() => setActiveFilter("volume")} badge={String(volumeSpikeCount)} badgeColor="warning">
           거래량 급등
         </FilterTab>
       </div>

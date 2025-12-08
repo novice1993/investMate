@@ -258,6 +258,10 @@ app.prepare().then(async () => {
     // KIS 연결 상태를 클라이언트에 전달
     socket.emit("kis-status", { connected: isKisConnected });
 
+    // 현재 시그널 상태 일괄 전송 (클라이언트 초기화용)
+    const currentSignals = Object.fromEntries(signalState);
+    socket.emit("signal-state-init", currentSignals);
+
     // 프론트엔드 구독 요청 → KIS에 구독 전달
     socket.on("subscribe", ({ stockCode }) => {
       if (dev) console.log(`[Socket.io] ${stockCode} 구독 요청`);
