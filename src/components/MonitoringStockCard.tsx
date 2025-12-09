@@ -1,10 +1,10 @@
 "use client";
 
 import { memo, useMemo } from "react";
+import { SparklineChart } from "@/components/SparklineChart";
 import { useDailyPrices } from "@/components/stock-chart/useDailyPrices";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
-import { SparklineChart } from "./SparklineChart";
-import type { ScreenedStock } from "../useScreenedStocks";
+import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 
 // ============================================================================
 // Types

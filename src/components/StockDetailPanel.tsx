@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { StockChartCard } from "@/components/stock-chart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
-import type { ScreenedStock } from "../useScreenedStocks";
+import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 
 // ============================================================================
 // Types
