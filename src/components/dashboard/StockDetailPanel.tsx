@@ -14,6 +14,8 @@ interface StockDetailPanelProps {
   stock: ScreenedStock;
   realtimePrice?: RealtimePrice;
   signal?: SignalTriggers;
+  /** 검색으로 선택한 종목 여부 (실시간 데이터 미지원) */
+  isSearchedStock?: boolean;
   onClose: () => void;
 }
 
@@ -21,7 +23,7 @@ interface StockDetailPanelProps {
 // Component
 // ============================================================================
 
-export function StockDetailPanel({ stock, realtimePrice, signal, onClose }: StockDetailPanelProps) {
+export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock = false, onClose }: StockDetailPanelProps) {
   // 가격 정보
   const priceInfo = useMemo(() => {
     if (!realtimePrice) {
@@ -52,7 +54,10 @@ export function StockDetailPanel({ stock, realtimePrice, signal, onClose }: Stoc
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-light-gray-90">{stock.corpName}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-light-gray-90">{stock.corpName}</h2>
+            {isSearchedStock && <span className="px-2 py-0.5 text-xs font-medium bg-light-gray-20 text-light-gray-60 rounded">검색 종목</span>}
+          </div>
           <p className="text-sm text-light-gray-50">{stock.stockCode}</p>
         </div>
         <button onClick={onClose} className="p-2 rounded-lg hover:bg-light-gray-5 transition-colors" aria-label="닫기">
@@ -64,16 +69,22 @@ export function StockDetailPanel({ stock, realtimePrice, signal, onClose }: Stoc
 
       {/* 가격 정보 */}
       <div className="mb-4 p-3 bg-light-gray-5 rounded-lg">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-light-gray-90">{priceInfo.price}</span>
-          <span className={`text-lg font-semibold ${changeColorClass}`}>{priceInfo.changeRate}</span>
-          {realtimePrice && <span className="w-2 h-2 rounded-full bg-light-success-50 animate-pulse" />}
-        </div>
-        <div className={`text-sm ${changeColorClass}`}>{priceInfo.change}</div>
+        {isSearchedStock ? (
+          <div className="text-sm text-light-gray-50">실시간 시세 미지원 종목입니다</div>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-light-gray-90">{priceInfo.price}</span>
+              <span className={`text-lg font-semibold ${changeColorClass}`}>{priceInfo.changeRate}</span>
+              {realtimePrice && <span className="w-2 h-2 rounded-full bg-light-success-50 animate-pulse" />}
+            </div>
+            <div className={`text-sm ${changeColorClass}`}>{priceInfo.change}</div>
+          </>
+        )}
       </div>
 
-      {/* 시그널 상태 */}
-      {signal && (signal.rsiOversold || signal.goldenCross || signal.volumeSpike) && (
+      {/* 시그널 상태 (선별 종목만) */}
+      {!isSearchedStock && signal && (signal.rsiOversold || signal.goldenCross || signal.volumeSpike) && (
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-light-gray-70 mb-2">활성 시그널</h3>
           <div className="flex gap-2 flex-wrap">
@@ -88,19 +99,21 @@ export function StockDetailPanel({ stock, realtimePrice, signal, onClose }: Stoc
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-light-gray-70 mb-2">주가 차트</h3>
         <div className="h-[250px] border border-light-gray-10 rounded-lg overflow-hidden">
-          <StockChartCard stockCode={stock.stockCode} enableRealtime={true} />
+          <StockChartCard stockCode={stock.stockCode} enableRealtime={!isSearchedStock} />
         </div>
       </div>
 
-      {/* 펀더멘털 지표 */}
-      <div>
-        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <MetricCard label="ROE" value={`${stock.roe.toFixed(1)}%`} />
-          <MetricCard label="부채비율" value={`${stock.debtRatio.toFixed(1)}%`} />
-          <MetricCard label="영업이익률" value={`${stock.operatingMargin.toFixed(1)}%`} />
+      {/* 펀더멘털 지표 (선별 종목만) */}
+      {!isSearchedStock && (
+        <div>
+          <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <MetricCard label="ROE" value={`${stock.roe.toFixed(1)}%`} />
+            <MetricCard label="부채비율" value={`${stock.debtRatio.toFixed(1)}%`} />
+            <MetricCard label="영업이익률" value={`${stock.operatingMargin.toFixed(1)}%`} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

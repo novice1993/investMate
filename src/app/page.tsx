@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
 import { SignalFeed } from "@/components/dashboard/SignalFeed";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
+import { StockSearch } from "@/components/dashboard/StockSearch";
 import { useRealtimePrice } from "@/components/stock-chart/useRealtimePrice";
+import type { KospiStock } from "@/hooks/useKospiStocks";
 import { useScreenedStocks, type ScreenedStock } from "@/hooks/useScreenedStocks";
 import { useSignalAlert } from "@/hooks/useSignalAlert";
 
@@ -15,6 +17,9 @@ import { useSignalAlert } from "@/hooks/useSignalAlert";
 // ============================================================================
 
 export type FilterType = "all" | "rsi" | "golden" | "volume";
+
+/** 상세 패널에 표시할 종목 (선별 종목 or 검색 종목) */
+type SelectedStock = { type: "screened"; stock: ScreenedStock } | { type: "searched"; stock: KospiStock };
 
 // ============================================================================
 // Page Component
@@ -30,11 +35,33 @@ export default function DashboardPage() {
   // 시그널 알림 데이터
   const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert();
 
-  // 선택된 종목 (상세 패널용)
-  const [selectedStock, setSelectedStock] = useState<ScreenedStock | null>(null);
+  // 선택된 종목 (상세 패널용) - 선별 종목 or 검색 종목
+  const [selectedStock, setSelectedStock] = useState<SelectedStock | null>(null);
 
   // 필터 상태
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+
+  // 선별 종목 코드 Set (검색 결과에서 구분용)
+  const screenedStockCodes = useMemo(() => new Set(stocks.map((s) => s.stockCode)), [stocks]);
+
+  // 선별 종목 클릭 핸들러
+  const handleScreenedStockClick = useCallback((stock: ScreenedStock) => {
+    setSelectedStock({ type: "screened", stock });
+  }, []);
+
+  // 검색 종목 선택 핸들러
+  const handleSearchSelect = useCallback(
+    (kospiStock: KospiStock) => {
+      // 선별 종목이면 해당 데이터로 열기
+      const screenedStock = stocks.find((s) => s.stockCode === kospiStock.stockCode);
+      if (screenedStock) {
+        setSelectedStock({ type: "screened", stock: screenedStock });
+      } else {
+        setSelectedStock({ type: "searched", stock: kospiStock });
+      }
+    },
+    [stocks]
+  );
 
   // 시그널 기반 필터링
   const filteredStocks = useMemo(() => {
@@ -62,10 +89,13 @@ export default function DashboardPage() {
       <div className="container mx-auto p-6">
         {/* 헤더 */}
         <header className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-shrink-0">
               <h1 className="text-2xl font-bold text-light-gray-90">실시간 모니터링</h1>
               <p className="text-sm text-light-gray-50">선별 종목 실시간 시세 및 시그널 감시</p>
+            </div>
+            <div className="flex items-center gap-4 flex-1 max-w-md">
+              <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
             </div>
             <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
           </div>
@@ -110,8 +140,8 @@ export default function DashboardPage() {
                       stock={stock}
                       realtimePrice={prices.get(stock.stockCode)}
                       signal={signals.get(stock.stockCode)}
-                      isSelected={selectedStock?.stockCode === stock.stockCode}
-                      onClick={() => setSelectedStock(stock)}
+                      isSelected={selectedStock?.stock.stockCode === stock.stockCode}
+                      onClick={() => handleScreenedStockClick(stock)}
                     />
                   ))}
                 </div>
@@ -125,7 +155,25 @@ export default function DashboardPage() {
           {/* 우측: 상세 패널 (종목 선택 시) */}
           {selectedStock && (
             <div className="col-span-4">
-              <StockDetailPanel stock={selectedStock} realtimePrice={prices.get(selectedStock.stockCode)} signal={signals.get(selectedStock.stockCode)} onClose={() => setSelectedStock(null)} />
+              {selectedStock.type === "screened" ? (
+                <StockDetailPanel
+                  stock={selectedStock.stock}
+                  realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                  signal={signals.get(selectedStock.stock.stockCode)}
+                  onClose={() => setSelectedStock(null)}
+                />
+              ) : (
+                <StockDetailPanel
+                  stock={{
+                    ...selectedStock.stock,
+                    roe: 0,
+                    debtRatio: 0,
+                    operatingMargin: 0,
+                  }}
+                  isSearchedStock
+                  onClose={() => setSelectedStock(null)}
+                />
+              )}
             </div>
           )}
         </div>
