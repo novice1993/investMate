@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { StockPriceChart, type RealtimeData } from "./StockPriceChart";
 import { useDailyPrices } from "./useDailyPrices";
 import { useRealtimePrice } from "./useRealtimePrice";
@@ -12,7 +12,7 @@ import { useRealtimePrice } from "./useRealtimePrice";
 interface StockChartCardProps {
   stockCode: string;
   corpName?: string;
-  /** 실시간 시세 구독 여부 (default: false) */
+  /** 실시간 시세 표시 여부 (default: false) */
   enableRealtime?: boolean;
 }
 
@@ -24,19 +24,12 @@ interface StockChartCardProps {
  * 주가 차트 카드 (Container)
  *
  * - 일봉 데이터 조회 (useDailyPrices)
- * - 실시간 데이터 구독 (useRealtimePrice) - enableRealtime=true일 때만
- * - StockPriceChart에 데이터 전달
+ * - 실시간 데이터 표시 (useRealtimePrice) - enableRealtime=true일 때만
+ * - 개별 구독 없음: 서버에서 40개 종목 일괄 구독 중
  */
 export function StockChartCard({ stockCode, corpName, enableRealtime = false }: StockChartCardProps) {
   const { candleData, isLoading, error } = useDailyPrices(stockCode);
-  const { prices, subscribe, isConnected } = useRealtimePrice();
-
-  // 실시간 구독 (enableRealtime일 때만)
-  useEffect(() => {
-    if (enableRealtime && isConnected && stockCode) {
-      subscribe(stockCode);
-    }
-  }, [enableRealtime, isConnected, stockCode, subscribe]);
+  const { prices } = useRealtimePrice();
 
   // 실시간 데이터를 RealtimeData 형식으로 변환
   const realtimeData: RealtimeData[] = useMemo(() => {

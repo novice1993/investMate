@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect, useState, useCallback } from "react";
+import { useSocketInstance } from "@/shared/providers/SocketProvider";
 
 // ============================================================================
 // Types
@@ -51,31 +51,32 @@ const MAX_RECENT_ALERTS = 50;
 // ============================================================================
 
 /**
- * Socket.io를 통한 실시간 시그널 알림 수신 훅
+ * 실시간 시그널 알림 훅
+ * - SocketProvider의 공유 Socket 인스턴스 사용
+ * - 상태는 훅 내부에서 관리 (구독 컴포넌트만 리렌더링)
  */
 export function useSignalAlert(): UseSignalAlertReturn {
+  const socket = useSocketInstance();
   const [signals, setSignals] = useState<Map<string, SignalTriggers>>(new Map());
   const [recentAlerts, setRecentAlerts] = useState<SignalAlert[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socket = io({
-      transports: ["websocket"],
-    });
+    if (!socket) return;
 
-    socketRef.current = socket;
+    // 이미 연결되어 있으면 상태 동기화
+    setIsConnected(socket.connected);
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       setIsConnected(true);
-    });
+    };
 
-    socket.on("disconnect", () => {
+    const handleDisconnect = () => {
       setIsConnected(false);
-    });
+    };
 
     // 초기 시그널 상태 수신 (접속 시 서버에서 일괄 전송)
-    socket.on("signal-state-init", (initialState: Record<string, SignalTriggers>) => {
+    const handleSignalStateInit = (initialState: Record<string, SignalTriggers>) => {
       console.log("[SignalAlert] 초기 상태 수신:", Object.keys(initialState).length, "개 종목");
 
       const stateMap = new Map<string, SignalTriggers>();
@@ -83,10 +84,10 @@ export function useSignalAlert(): UseSignalAlertReturn {
         stateMap.set(stockCode, triggers);
       }
       setSignals(stateMap);
-    });
+    };
 
     // 실시간 시그널 알림 수신
-    socket.on("signal-alert", (alert: SignalAlert) => {
+    const handleSignalAlert = (alert: SignalAlert) => {
       console.log("[SignalAlert] 수신:", alert);
 
       // 시그널 상태 업데이트
@@ -113,12 +114,20 @@ export function useSignalAlert(): UseSignalAlertReturn {
         const next = [alert, ...prev];
         return next.slice(0, MAX_RECENT_ALERTS);
       });
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("signal-state-init", handleSignalStateInit);
+    socket.on("signal-alert", handleSignalAlert);
 
     return () => {
-      socket.disconnect();
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("signal-state-init", handleSignalStateInit);
+      socket.off("signal-alert", handleSignalAlert);
     };
-  }, []);
+  }, [socket]);
 
   // 시그널 카운트 계산
   const rsiCount = Array.from(signals.values()).filter((s) => s.rsiOversold).length;
