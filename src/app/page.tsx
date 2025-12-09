@@ -1,6 +1,8 @@
 "use client";
 
+import { AnimatePresence } from "motion/react";
 import { useState, useMemo, useCallback } from "react";
+import { AnimatedListItem, SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
 import { SignalFeed } from "@/components/dashboard/SignalFeed";
@@ -134,16 +136,19 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {filteredStocks.map((stock) => (
-                    <StockCard
-                      key={stock.stockCode}
-                      stock={stock}
-                      realtimePrice={prices.get(stock.stockCode)}
-                      signal={signals.get(stock.stockCode)}
-                      isSelected={selectedStock?.stock.stockCode === stock.stockCode}
-                      onClick={() => handleScreenedStockClick(stock)}
-                    />
-                  ))}
+                  <AnimatePresence mode="popLayout">
+                    {filteredStocks.map((stock) => (
+                      <AnimatedListItem key={stock.stockCode} itemKey={stock.stockCode}>
+                        <StockCard
+                          stock={stock}
+                          realtimePrice={prices.get(stock.stockCode)}
+                          signal={signals.get(stock.stockCode)}
+                          isSelected={selectedStock?.stock.stockCode === stock.stockCode}
+                          onClick={() => handleScreenedStockClick(stock)}
+                        />
+                      </AnimatedListItem>
+                    ))}
+                  </AnimatePresence>
                 </div>
               )}
             </section>
@@ -153,29 +158,31 @@ export default function DashboardPage() {
           </div>
 
           {/* 우측: 상세 패널 (종목 선택 시) */}
-          {selectedStock && (
-            <div className="col-span-4">
-              {selectedStock.type === "screened" ? (
-                <StockDetailPanel
-                  stock={selectedStock.stock}
-                  realtimePrice={prices.get(selectedStock.stock.stockCode)}
-                  signal={signals.get(selectedStock.stock.stockCode)}
-                  onClose={() => setSelectedStock(null)}
-                />
-              ) : (
-                <StockDetailPanel
-                  stock={{
-                    ...selectedStock.stock,
-                    roe: 0,
-                    debtRatio: 0,
-                    operatingMargin: 0,
-                  }}
-                  isSearchedStock
-                  onClose={() => setSelectedStock(null)}
-                />
-              )}
-            </div>
-          )}
+          <AnimatePresence>
+            {selectedStock && (
+              <SlideIn direction="right" className="col-span-4">
+                {selectedStock.type === "screened" ? (
+                  <StockDetailPanel
+                    stock={selectedStock.stock}
+                    realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                    signal={signals.get(selectedStock.stock.stockCode)}
+                    onClose={() => setSelectedStock(null)}
+                  />
+                ) : (
+                  <StockDetailPanel
+                    stock={{
+                      ...selectedStock.stock,
+                      roe: 0,
+                      debtRatio: 0,
+                      operatingMargin: 0,
+                    }}
+                    isSearchedStock
+                    onClose={() => setSelectedStock(null)}
+                  />
+                )}
+              </SlideIn>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
