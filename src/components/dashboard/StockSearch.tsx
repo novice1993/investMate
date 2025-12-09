@@ -31,6 +31,7 @@ export function StockSearch({ onSelect, screenedStockCodes = new Set() }: StockS
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // 디바운스 검색
@@ -70,6 +71,16 @@ export function StockSearch({ onSelect, screenedStockCodes = new Set() }: StockS
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // activeIndex 변경 시 스크롤
+  useEffect(() => {
+    if (activeIndex >= 0 && listRef.current) {
+      const activeItem = listRef.current.children[activeIndex] as HTMLElement;
+      if (activeItem) {
+        activeItem.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [activeIndex]);
 
   // 종목 선택
   const handleSelect = useCallback(
@@ -151,7 +162,7 @@ export function StockSearch({ onSelect, screenedStockCodes = new Set() }: StockS
       {/* 검색 결과 드롭다운 */}
       {isOpen && (
         <div ref={dropdownRef} className="absolute z-50 w-full mt-1 bg-light-gray-0 border border-light-gray-20 rounded-lg shadow-lg overflow-hidden">
-          <ul className="max-h-64 overflow-y-auto">
+          <ul ref={listRef} className="max-h-64 overflow-y-auto">
             {results.map((stock, index) => {
               const isScreened = screenedStockCodes.has(stock.stockCode);
               const isActive = index === activeIndex;

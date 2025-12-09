@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { StockChartCard } from "@/components/stock-chart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
+import { useFinancialMetrics } from "@/hooks/useFinancialMetrics";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
 
@@ -24,6 +25,20 @@ interface StockDetailPanelProps {
 // ============================================================================
 
 export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock = false, onClose }: StockDetailPanelProps) {
+  // 펀더멘털 지표 조회 (검색 종목일 때만 API 호출)
+  const { data: metrics, isLoading: isLoadingMetrics } = useFinancialMetrics(isSearchedStock ? stock.stockCode : undefined);
+
+  // 펀더멘털 지표 (선별 종목은 props, 검색 종목은 API)
+  const financialMetrics = useMemo(() => {
+    if (!isSearchedStock) {
+      return { roe: stock.roe, debtRatio: stock.debtRatio, operatingMargin: stock.operatingMargin };
+    }
+    if (metrics) {
+      return { roe: metrics.roe, debtRatio: metrics.debtRatio, operatingMargin: metrics.operatingMargin };
+    }
+    return null;
+  }, [isSearchedStock, stock, metrics]);
+
   // 가격 정보
   const priceInfo = useMemo(() => {
     if (!realtimePrice) {
@@ -103,17 +118,27 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
         </div>
       </div>
 
-      {/* 펀더멘털 지표 (선별 종목만) */}
-      {!isSearchedStock && (
-        <div>
-          <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
+      {/* 펀더멘털 지표 */}
+      <div>
+        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
+        {isLoadingMetrics ? (
           <div className="grid grid-cols-3 gap-2">
-            <MetricCard label="ROE" value={`${stock.roe.toFixed(1)}%`} />
-            <MetricCard label="부채비율" value={`${stock.debtRatio.toFixed(1)}%`} />
-            <MetricCard label="영업이익률" value={`${stock.operatingMargin.toFixed(1)}%`} />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
           </div>
-        </div>
-      )}
+        ) : financialMetrics ? (
+          <div className="grid grid-cols-3 gap-2">
+            <MetricCard label="ROE" value={`${financialMetrics.roe.toFixed(1)}%`} />
+            <MetricCard label="부채비율" value={`${financialMetrics.debtRatio.toFixed(1)}%`} />
+            <MetricCard label="영업이익률" value={`${financialMetrics.operatingMargin.toFixed(1)}%`} />
+          </div>
+        ) : (
+          <div className="p-3 bg-light-gray-5 rounded-lg text-center">
+            <span className="text-sm text-light-gray-40">재무지표 데이터 없음</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -142,6 +167,15 @@ function MetricCard({ label, value }: MetricCardProps) {
     <div className="p-3 bg-light-gray-5 rounded-lg text-center">
       <div className="text-xs text-light-gray-50 mb-1">{label}</div>
       <div className="text-sm font-semibold text-light-gray-90">{value}</div>
+    </div>
+  );
+}
+
+function MetricCardSkeleton() {
+  return (
+    <div className="p-3 bg-light-gray-5 rounded-lg text-center animate-pulse">
+      <div className="h-3 w-10 bg-light-gray-20 rounded mx-auto mb-2" />
+      <div className="h-4 w-12 bg-light-gray-20 rounded mx-auto" />
     </div>
   );
 }
