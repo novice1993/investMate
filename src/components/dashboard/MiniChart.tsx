@@ -1,7 +1,9 @@
 "use client";
 
+import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { useDailyPrices } from "@/components/stock-chart/useDailyPrices";
+import { colorTokens } from "@/styles/tokens";
 
 // ============================================================================
 // Types
@@ -13,28 +15,14 @@ interface MiniChartProps {
 
 type Trend = "rise" | "fall" | "flat";
 
-interface ChartData {
-  prices: number[];
-  trend: Trend;
-  pathData: string;
-  areaData: string;
-}
-
 // ============================================================================
 // Constants
 // ============================================================================
 
-const CHART_CONFIG = {
-  width: 100,
-  height: 48,
-  padding: 4,
-  strokeWidth: 2,
-} as const;
-
-const TREND_COLORS: Record<Trend, { stroke: string; gradientId: string }> = {
-  rise: { stroke: "#de3412", gradientId: "gradient-rise" },
-  fall: { stroke: "#0b78cb", gradientId: "gradient-fall" },
-  flat: { stroke: "#6b7280", gradientId: "gradient-flat" },
+const CHART_COLORS = {
+  rise: colorTokens["light-danger-50"],
+  fall: colorTokens["light-information-50"],
+  flat: colorTokens["light-gray-40"],
 };
 
 // ============================================================================
@@ -44,48 +32,112 @@ const TREND_COLORS: Record<Trend, { stroke: string; gradientId: string }> = {
 export function MiniChart({ stockCode }: MiniChartProps) {
   const { candleData, isLoading } = useDailyPrices(stockCode);
 
-  const chartData = useMemo<ChartData | null>(() => {
-    if (candleData.length < 2) return null;
+  const { option, trend } = useMemo(() => {
+    if (candleData.length < 2) {
+      return { option: null, trend: "flat" as Trend };
+    }
 
     const prices = candleData.slice(-20).map((d) => d.close);
     const trend = calculateTrend(prices);
-    const { pathData, areaData } = generatePaths(prices);
+    const color = CHART_COLORS[trend];
 
-    return { prices, trend, pathData, areaData };
+    const option = {
+      animation: true,
+      animationDuration: 800,
+      animationEasing: "cubicOut",
+      grid: {
+        left: 0,
+        right: 0,
+        top: 2,
+        bottom: 2,
+      },
+      xAxis: {
+        type: "category",
+        show: false,
+        data: prices.map((_, i) => i),
+      },
+      yAxis: {
+        type: "value",
+        show: false,
+        scale: true,
+        min: (value: { min: number }) => value.min * 0.998,
+        max: (value: { max: number }) => value.max * 1.002,
+      },
+      series: [
+        {
+          type: "line",
+          data: prices,
+          smooth: 0.4,
+          symbol: "none",
+          lineStyle: {
+            width: 2,
+            color: color,
+            shadowColor: `${color}40`,
+            shadowBlur: 4,
+            shadowOffsetY: 2,
+          },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: `${color}30` },
+                { offset: 0.5, color: `${color}15` },
+                { offset: 1, color: `${color}05` },
+              ],
+            },
+          },
+          emphasis: {
+            disabled: true,
+          },
+        },
+      ],
+      tooltip: {
+        show: true,
+        trigger: "axis",
+        backgroundColor: colorTokens["light-gray-90"],
+        borderColor: colorTokens["light-gray-70"],
+        borderWidth: 1,
+        padding: [4, 8],
+        textStyle: {
+          color: colorTokens["light-gray-0"],
+          fontSize: 11,
+        },
+        formatter: (params: { value: number }[]) => {
+          const value = params[0]?.value;
+          if (value === undefined) return "";
+          return `${value.toLocaleString()}원`;
+        },
+        axisPointer: {
+          type: "line",
+          lineStyle: {
+            color: `${color}60`,
+            width: 1,
+            type: "dashed",
+          },
+        },
+      },
+    };
+
+    return { option, trend };
   }, [candleData]);
 
-  // 로딩 상태
   if (isLoading) {
     return <ChartSkeleton />;
   }
 
-  // 데이터 없음
-  if (!chartData) {
+  if (!option) {
     return <ChartEmpty />;
   }
 
-  const colors = TREND_COLORS[chartData.trend];
-
   return (
-    <div className="w-full h-full group relative">
-      <svg viewBox={`0 0 ${CHART_CONFIG.width} ${CHART_CONFIG.height}`} className="w-full h-full" preserveAspectRatio="none">
-        {/* 그라데이션 정의 */}
-        <defs>
-          <linearGradient id={colors.gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={colors.stroke} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={colors.stroke} stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-
-        {/* 영역 채움 */}
-        <path d={chartData.areaData} fill={`url(#${colors.gradientId})`} className="transition-opacity duration-200" />
-
-        {/* 라인 */}
-        <path d={chartData.pathData} fill="none" stroke={colors.stroke} strokeWidth={CHART_CONFIG.strokeWidth} strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-200" />
-
-        {/* 마지막 점 (호버 시 강조) */}
-        <LastPoint prices={chartData.prices} stroke={colors.stroke} />
-      </svg>
+    <div className="w-full h-full relative group">
+      <ReactECharts option={option} style={{ height: "100%", width: "100%" }} opts={{ renderer: "canvas" }} notMerge={true} lazyUpdate={true} />
+      {/* 트렌드 인디케이터 */}
+      <TrendIndicator trend={trend} />
     </div>
   );
 }
@@ -95,7 +147,11 @@ export function MiniChart({ stockCode }: MiniChartProps) {
 // ============================================================================
 
 function ChartSkeleton() {
-  return <div className="w-full h-full bg-light-gray-5 rounded animate-pulse" />;
+  return (
+    <div className="w-full h-full bg-light-gray-5 rounded overflow-hidden">
+      <div className="h-full w-full animate-pulse bg-gradient-to-r from-light-gray-5 via-light-gray-10 to-light-gray-5 bg-[length:200%_100%] animate-shimmer" />
+    </div>
+  );
 }
 
 function ChartEmpty() {
@@ -106,32 +162,18 @@ function ChartEmpty() {
   );
 }
 
-interface LastPointProps {
-  prices: number[];
-  stroke: string;
+interface TrendIndicatorProps {
+  trend: Trend;
 }
 
-function LastPoint({ prices, stroke }: LastPointProps) {
-  const { x, y } = useMemo(() => {
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const range = max - min || 1;
+function TrendIndicator({ trend }: TrendIndicatorProps) {
+  if (trend === "flat") return null;
 
-    const lastPrice = prices[prices.length - 1];
-    const x = CHART_CONFIG.width - CHART_CONFIG.padding;
-    const y = CHART_CONFIG.height - CHART_CONFIG.padding - ((lastPrice - min) / range) * (CHART_CONFIG.height - CHART_CONFIG.padding * 2);
+  const isRise = trend === "rise";
+  const color = isRise ? "text-light-danger-50" : "text-light-information-50";
+  const icon = isRise ? "▲" : "▼";
 
-    return { x, y };
-  }, [prices]);
-
-  return (
-    <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-      {/* 외곽 원 */}
-      <circle cx={x} cy={y} r="4" fill="white" stroke={stroke} strokeWidth="2" />
-      {/* 내부 점 */}
-      <circle cx={x} cy={y} r="2" fill={stroke} />
-    </g>
-  );
+  return <span className={`absolute top-0 right-0 text-[10px] font-bold ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>{icon}</span>;
 }
 
 // ============================================================================
@@ -147,26 +189,4 @@ function calculateTrend(prices: number[]): Trend {
   if (last > first) return "rise";
   if (last < first) return "fall";
   return "flat";
-}
-
-function generatePaths(prices: number[]): { pathData: string; areaData: string } {
-  const { width, height, padding } = CHART_CONFIG;
-
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
-
-  const points = prices.map((price, i) => {
-    const x = (i / (prices.length - 1)) * (width - padding * 2) + padding;
-    const y = height - padding - ((price - min) / range) * (height - padding * 2);
-    return { x, y };
-  });
-
-  // 라인 경로
-  const pathData = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
-
-  // 영역 경로 (라인 + 하단 닫기)
-  const areaData = `${pathData} L ${points[points.length - 1].x},${height - padding} L ${padding},${height - padding} Z`;
-
-  return { pathData, areaData };
 }
