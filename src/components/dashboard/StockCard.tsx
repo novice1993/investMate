@@ -32,9 +32,9 @@ export const StockCard = memo(function StockCard({ stock, realtimePrice, signal,
     <article
       onClick={onClick}
       className={`
-        relative p-4 rounded-xl cursor-pointer
+        relative p-5 rounded-xl cursor-pointer
         transition-all duration-200 ease-out
-        hover:scale-[1.02] hover:shadow-lg
+        hover:scale-[1.01] hover:shadow-lg
         ${isSelected ? "bg-light-primary-5 border-2 border-light-primary-50 shadow-lg" : "bg-light-gray-0 border border-light-gray-20 hover:border-light-gray-30"}
       `}
     >
@@ -48,7 +48,7 @@ export const StockCard = memo(function StockCard({ stock, realtimePrice, signal,
       <PriceDisplay realtimePrice={realtimePrice} />
 
       {/* 미니 차트 */}
-      <div className="h-14 mb-3">
+      <div className="h-24 mb-4">
         <MiniChart stockCode={stock.stockCode} />
       </div>
 
@@ -77,8 +77,8 @@ interface CardHeaderProps {
 
 function CardHeader({ corpName, stockCode }: CardHeaderProps) {
   return (
-    <header className="mb-2 pr-4">
-      <h3 className="font-semibold text-light-gray-90 text-sm truncate">{corpName}</h3>
+    <header className="mb-3 pr-4">
+      <h3 className="font-semibold text-light-gray-90 text-base truncate">{corpName}</h3>
       <p className="text-xs text-light-gray-40">{stockCode}</p>
     </header>
   );

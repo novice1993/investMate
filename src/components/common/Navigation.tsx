@@ -2,45 +2,63 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
-export function Navigation() {
+// ============================================================================
+// Types
+// ============================================================================
+
+interface NavigationProps {
+  /** 우측에 표시할 추가 요소 (검색, 상태 표시 등) */
+  rightSlot?: ReactNode;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const NAV_ITEMS = [
+  { href: "/", label: "대시보드" },
+  { href: "/news", label: "뉴스" },
+];
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export function Navigation({ rightSlot }: NavigationProps) {
   const pathname = usePathname();
 
-  const navItems = [
-    { href: "/", label: "대시보드", icon: "📊" },
-    { href: "/news", label: "뉴스", icon: "📰" },
-  ];
-
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 backdrop-blur-sm bg-white/95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          {/* 로고 */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <span className="text-2xl font-bold text-blue-600">💼</span>
-              <span className="text-xl font-bold text-gray-900">investMate</span>
+    <nav className="bg-light-gray-0 border-b border-light-gray-20 sticky top-0 z-50">
+      <div className="container mx-auto px-6">
+        <div className="flex items-center justify-between h-14">
+          {/* 좌측: 로고 + 네비게이션 */}
+          <div className="flex items-center gap-8">
+            {/* 로고 */}
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-lg font-bold text-light-gray-90">investMate</span>
             </Link>
+
+            {/* 네비게이션 메뉴 */}
+            <div className="flex items-center gap-1">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive ? "bg-light-primary-5 text-light-primary-60" : "text-light-gray-50 hover:text-light-gray-90 hover:bg-light-gray-5"}`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
-          {/* 네비게이션 메뉴 */}
-          <div className="flex space-x-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-100"
-                  }`}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+          {/* 우측: 슬롯 (검색, 연결 상태 등) */}
+          {rightSlot && <div className="flex items-center gap-4">{rightSlot}</div>}
         </div>
       </div>
     </nav>
