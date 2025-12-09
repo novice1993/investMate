@@ -8,7 +8,6 @@ export function Navigation() {
 
   const navItems = [
     { href: "/", label: "대시보드", icon: "📊" },
-    { href: "/monitoring", label: "모니터링", icon: "🔔" },
     { href: "/news", label: "뉴스", icon: "📰" },
   ];
 
