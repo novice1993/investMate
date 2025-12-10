@@ -1,5 +1,6 @@
 "use client";
 
+import type { Ref } from "react";
 import { memo } from "react";
 import { MiniChart } from "@/components/stockChart/MiniChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
@@ -18,18 +19,21 @@ interface StockCardProps {
   signal?: SignalTriggers;
   isSelected: boolean;
   onClick: () => void;
+  /** 스크롤 등을 위한 ref */
+  ref?: Ref<HTMLDivElement>;
 }
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export const StockCard = memo(function StockCard({ stock, realtimePrice, signal, isSelected, onClick }: StockCardProps) {
+export const StockCard = memo(function StockCard({ stock, realtimePrice, signal, isSelected, onClick, ref }: StockCardProps) {
   // 활성 시그널 여부
   const hasSignal = signal && (signal.rsiOversold || signal.goldenCross || signal.volumeSpike);
 
   return (
     <article
+      ref={ref}
       onClick={onClick}
       className={`
         relative p-5 rounded-xl cursor-pointer
