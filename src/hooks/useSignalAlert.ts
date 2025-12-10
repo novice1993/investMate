@@ -35,6 +35,13 @@ export interface SignalState {
   volumeSpikeCount: number;
 }
 
+interface UseSignalAlertOptions {
+  /** 새 시그널 발생 시 호출되는 콜백 */
+  onNewAlert?: (alert: SignalAlert, corpName?: string) => void;
+  /** 종목 코드 → 종목명 매핑 */
+  stockNameMap?: Map<string, string>;
+}
+
 interface UseSignalAlertReturn extends SignalState {
   isConnected: boolean;
   clearAlerts: () => void;
@@ -55,7 +62,8 @@ const MAX_RECENT_ALERTS = 50;
  * - SocketProvider의 공유 Socket 인스턴스 사용
  * - 상태는 훅 내부에서 관리 (구독 컴포넌트만 리렌더링)
  */
-export function useSignalAlert(): UseSignalAlertReturn {
+export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAlertReturn {
+  const { onNewAlert, stockNameMap } = options;
   const socket = useSocketInstance();
   const [signals, setSignals] = useState<Map<string, SignalTriggers>>(new Map());
   const [recentAlerts, setRecentAlerts] = useState<SignalAlert[]>([]);
@@ -114,6 +122,12 @@ export function useSignalAlert(): UseSignalAlertReturn {
         const next = [alert, ...prev];
         return next.slice(0, MAX_RECENT_ALERTS);
       });
+
+      // 콜백 호출 (토스트 등)
+      if (onNewAlert) {
+        const corpName = stockNameMap?.get(alert.stockCode);
+        onNewAlert(alert, corpName);
+      }
     };
 
     socket.on("connect", handleConnect);
@@ -127,7 +141,7 @@ export function useSignalAlert(): UseSignalAlertReturn {
       socket.off("signal-state-init", handleSignalStateInit);
       socket.off("signal-alert", handleSignalAlert);
     };
-  }, [socket]);
+  }, [socket, onNewAlert, stockNameMap]);
 
   // 시그널 카운트 계산
   const rsiCount = Array.from(signals.values()).filter((s) => s.rsiOversold).length;

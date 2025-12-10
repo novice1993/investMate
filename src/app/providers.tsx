@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { Toaster } from "sonner";
 import { SocketProvider } from "@/shared/providers/SocketProvider";
 
 interface ProvidersProps {
@@ -23,7 +24,10 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SocketProvider>{children}</SocketProvider>
+      <SocketProvider>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
+      </SocketProvider>
     </QueryClientProvider>
   );
 }

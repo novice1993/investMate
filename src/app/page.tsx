@@ -2,6 +2,7 @@
 
 import { AnimatePresence } from "motion/react";
 import { useState, useMemo, useCallback } from "react";
+import { toast } from "sonner";
 import { AnimatedList, AnimatedListItem, SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
@@ -13,7 +14,7 @@ import { StockSearch } from "@/components/dashboard/StockSearch";
 import { useRealtimePrice } from "@/components/stockChart/useRealtimePrice";
 import type { KospiStock } from "@/hooks/useKospiStocks";
 import { useScreenedStocks, type ScreenedStock } from "@/hooks/useScreenedStocks";
-import { useSignalAlert } from "@/hooks/useSignalAlert";
+import { useSignalAlert, type SignalAlert } from "@/hooks/useSignalAlert";
 
 // ============================================================================
 // Types
@@ -35,11 +36,50 @@ export default function DashboardPage() {
   // 실시간 가격 데이터
   const { prices, isConnected, isKisConnected } = useRealtimePrice();
 
-  // 시그널 알림 데이터
-  const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert();
-
   // 선택된 종목 (상세 패널용) - 선별 종목 or 검색 종목
   const [selectedStock, setSelectedStock] = useState<SelectedStock | null>(null);
+
+  // 종목 코드 → 종목명 매핑
+  const stockNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    stocks.forEach((s) => map.set(s.stockCode, s.corpName));
+    return map;
+  }, [stocks]);
+
+  // 시그널 토스트 핸들러
+  const handleSignalAlert = useCallback(
+    (alert: SignalAlert, corpName?: string) => {
+      const name = corpName || alert.stockCode;
+      const signals: string[] = [];
+
+      if (alert.triggers.rsiOversold) signals.push("RSI 과매도");
+      if (alert.triggers.goldenCross) signals.push("골든크로스");
+      if (alert.triggers.volumeSpike) signals.push("거래량 급등");
+
+      const signalText = signals.join(", ");
+
+      toast.info(`${name}`, {
+        description: signalText,
+        action: {
+          label: "확인",
+          onClick: () => {
+            // 해당 종목으로 포커스 이동
+            const stock = stocks.find((s) => s.stockCode === alert.stockCode);
+            if (stock) {
+              setSelectedStock({ type: "screened", stock });
+            }
+          },
+        },
+      });
+    },
+    [stocks]
+  );
+
+  // 시그널 알림 데이터
+  const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert({
+    onNewAlert: handleSignalAlert,
+    stockNameMap,
+  });
 
   // 필터 상태
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
