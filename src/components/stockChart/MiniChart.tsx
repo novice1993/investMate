@@ -2,8 +2,8 @@
 
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
-import { useDailyPrices } from "@/components/stock-chart/useDailyPrices";
 import { colorTokens } from "@/styles/tokens";
+import { useDailyPrices } from "./useDailyPrices";
 
 // ============================================================================
 // Types
@@ -30,7 +30,7 @@ const CHART_COLORS = {
 // ============================================================================
 
 export function MiniChart({ stockCode }: MiniChartProps) {
-  const { candleData, isLoading } = useDailyPrices(stockCode);
+  const { candleData, isLoading, error } = useDailyPrices(stockCode);
 
   const { option, trend } = useMemo(() => {
     if (candleData.length < 2) {
@@ -129,6 +129,10 @@ export function MiniChart({ stockCode }: MiniChartProps) {
     return <ChartSkeleton />;
   }
 
+  if (error) {
+    return <ChartError />;
+  }
+
   if (!option) {
     return <ChartEmpty />;
   }
@@ -158,6 +162,21 @@ function ChartEmpty() {
   return (
     <div className="w-full h-full flex items-center justify-center bg-light-gray-5 rounded">
       <span className="text-xs text-light-gray-30">-</span>
+    </div>
+  );
+}
+
+function ChartError() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-light-danger-5 rounded">
+      <svg className="w-4 h-4 text-light-danger-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
     </div>
   );
 }

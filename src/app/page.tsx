@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence } from "motion/react";
-import { useState, useMemo, useCallback } from "react";
-import { SlideIn } from "@/components/animation";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
+import { AnimatedList, AnimatedListItem, SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
 import { MobileMenu } from "@/components/dashboard/MobileMenu";
@@ -10,10 +11,10 @@ import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
 import { StockSearch } from "@/components/dashboard/StockSearch";
-import { useRealtimePrice } from "@/components/stock-chart/useRealtimePrice";
+import { useRealtimePrice } from "@/components/stockChart/useRealtimePrice";
 import type { KospiStock } from "@/hooks/useKospiStocks";
 import { useScreenedStocks, type ScreenedStock } from "@/hooks/useScreenedStocks";
-import { useSignalAlert } from "@/hooks/useSignalAlert";
+import { useSignalAlert, type SignalAlert } from "@/hooks/useSignalAlert";
 
 // ============================================================================
 // Types
@@ -35,11 +36,53 @@ export default function DashboardPage() {
   // 실시간 가격 데이터
   const { prices, isConnected, isKisConnected } = useRealtimePrice();
 
-  // 시그널 알림 데이터
-  const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert();
-
   // 선택된 종목 (상세 패널용) - 선별 종목 or 검색 종목
   const [selectedStock, setSelectedStock] = useState<SelectedStock | null>(null);
+
+  // StockCard ref 관리 (스크롤용)
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // 종목 코드 → 종목명 매핑
+  const stockNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    stocks.forEach((s) => map.set(s.stockCode, s.corpName));
+    return map;
+  }, [stocks]);
+
+  // 시그널 토스트 핸들러
+  const handleSignalAlert = useCallback(
+    (alert: SignalAlert, corpName?: string) => {
+      const name = corpName || alert.stockCode;
+      const signals: string[] = [];
+
+      if (alert.triggers.rsiOversold) signals.push("RSI 과매도");
+      if (alert.triggers.goldenCross) signals.push("골든크로스");
+      if (alert.triggers.volumeSpike) signals.push("거래량 급등");
+
+      const signalText = signals.join(", ");
+
+      toast.info(`${name}`, {
+        description: signalText,
+        action: {
+          label: "확인",
+          onClick: () => {
+            // 해당 종목으로 포커스 이동
+            const stock = stocks.find((s) => s.stockCode === alert.stockCode);
+            if (stock) {
+              setSelectedStock({ type: "screened", stock });
+            }
+          },
+        },
+      });
+    },
+    [stocks]
+  );
+
+  // 시그널 알림 데이터
+  const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert({
+    onNewAlert: handleSignalAlert,
+    stockNameMap,
+  });
 
   // 필터 상태
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
@@ -86,6 +129,37 @@ export default function DashboardPage() {
       }
     });
   }, [stocks, activeFilter, signals]);
+
+  // ref 콜백 생성 함수
+  const createCardRefCallback = useCallback(
+    (stockCode: string) => (el: HTMLDivElement | null) => {
+      if (el) {
+        cardRefs.current.set(stockCode, el);
+      } else {
+        cardRefs.current.delete(stockCode);
+      }
+    },
+    []
+  );
+
+  // 선택된 종목 변경 시 해당 카드로 스크롤 (Desktop만)
+  useEffect(() => {
+    if (!selectedStock || selectedStock.type !== "screened") return;
+
+    // 모바일에서는 전체화면 모달이므로 스크롤 불필요
+    const isDesktop = window.innerWidth >= 1024; // lg breakpoint
+    if (!isDesktop) return;
+
+    const stockCode = selectedStock.stock.stockCode;
+    const element = cardRefs.current.get(stockCode);
+
+    if (element) {
+      // 약간의 딜레이 후 스크롤 (레이아웃 변경 후)
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [selectedStock]);
 
   return (
     <div className="min-h-screen bg-light-gray-5">
@@ -169,18 +243,20 @@ export default function DashboardPage() {
                 <p className="text-light-gray-40">{activeFilter === "all" ? "선별된 종목이 없습니다" : "해당 시그널 종목이 없습니다"}</p>
               </div>
             ) : (
-              <div className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
+              <AnimatedList className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
                 {filteredStocks.map((stock) => (
-                  <StockCard
-                    key={stock.stockCode}
-                    stock={stock}
-                    realtimePrice={prices.get(stock.stockCode)}
-                    signal={signals.get(stock.stockCode)}
-                    isSelected={selectedStock?.stock.stockCode === stock.stockCode}
-                    onClick={() => handleScreenedStockClick(stock)}
-                  />
+                  <AnimatedListItem key={stock.stockCode} itemKey={stock.stockCode}>
+                    <StockCard
+                      ref={createCardRefCallback(stock.stockCode)}
+                      stock={stock}
+                      realtimePrice={prices.get(stock.stockCode)}
+                      signal={signals.get(stock.stockCode)}
+                      isSelected={selectedStock?.stock.stockCode === stock.stockCode}
+                      onClick={() => handleScreenedStockClick(stock)}
+                    />
+                  </AnimatedListItem>
                 ))}
-              </div>
+              </AnimatedList>
             )}
           </div>
 

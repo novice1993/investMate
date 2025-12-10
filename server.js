@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
+import { startMockSignalEmitter } from "./src/core/dev/mock-signal.ts";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
 import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
 import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
@@ -320,5 +321,18 @@ app.prepare().then(async () => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Next.js + Socket.io 서버 실행 중`);
+
+    // =========================================================================
+    // [개발용] 모의 시그널 발생기
+    // - 장 마감 후 토스트 알림 등을 테스트할 때 주석 해제
+    // - interval: 발생 주기 (ms)
+    // - enabled: true로 설정하면 활성화
+    // =========================================================================
+    if (dev) {
+      startMockSignalEmitter(io, {
+        enabled: true, // true로 변경하면 활성화
+        interval: 8000, // 8초마다 발생
+      });
+    }
   });
 });
