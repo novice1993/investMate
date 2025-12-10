@@ -40,22 +40,25 @@ export function SignalFeed({ alerts, stocks }: SignalFeedProps) {
 
   if (recentAlerts.length === 0) {
     return (
-      <section className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4">
-        <h2 className="text-sm font-semibold text-light-gray-70 mb-3">실시간 알림</h2>
-        <div className="flex items-center justify-center h-24 text-light-gray-40 text-sm">시그널 대기 중...</div>
-      </section>
+      <div className="flex items-center gap-2 text-light-gray-40 text-sm">
+        <span className="text-xs font-medium text-light-gray-50">실시간 알림</span>
+        <span className="text-light-gray-30">|</span>
+        <span>시그널 대기 중...</span>
+      </div>
     );
   }
 
   return (
-    <section className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4">
-      <h2 className="text-sm font-semibold text-light-gray-70 mb-3">실시간 알림</h2>
-      <div className="space-y-2 max-h-48 overflow-y-auto">
-        {recentAlerts.map((alert, index) => (
-          <AlertItem key={`${alert.stockCode}-${alert.timestamp}-${index}`} alert={alert} stockName={stockNameMap.get(alert.stockCode) || alert.stockCode} />
-        ))}
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-medium text-light-gray-50 flex-shrink-0">실시간 알림</span>
+      <div className="flex-1 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-2">
+          {recentAlerts.map((alert, index) => (
+            <AlertItem key={`${alert.stockCode}-${alert.timestamp}-${index}`} alert={alert} stockName={stockNameMap.get(alert.stockCode) || alert.stockCode} />
+          ))}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -83,25 +86,23 @@ function AlertItem({ alert, stockName }: AlertItemProps) {
   // 시간 포맷
   const timeStr = useMemo(() => {
     const date = new Date(alert.timestamp);
-    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
   }, [alert.timestamp]);
 
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-light-gray-5 transition-colors">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-gray-5 border border-light-gray-20 flex-shrink-0">
       {/* 시간 */}
-      <span className="text-xs text-light-gray-40 font-mono w-16 flex-shrink-0">{timeStr}</span>
+      <span className="text-xs text-light-gray-40 font-mono">{timeStr}</span>
 
       {/* 종목명 */}
-      <span className="text-sm font-medium text-light-gray-90 flex-shrink-0">{stockName}</span>
+      <span className="text-xs font-medium text-light-gray-90">{stockName}</span>
 
       {/* 시그널 뱃지들 */}
-      <div className="flex gap-1 flex-wrap">
-        {triggeredSignals.map(({ key, config }) => (
-          <span key={key} className={`px-2 py-0.5 rounded text-xs font-medium text-light-gray-0 ${config.color}`}>
-            {config.icon} {config.label}
-          </span>
-        ))}
-      </div>
+      {triggeredSignals.map(({ key, config }) => (
+        <span key={key} className={`px-1.5 py-0.5 rounded text-xs font-medium text-light-gray-0 ${config.color}`}>
+          {config.icon}
+        </span>
+      ))}
     </div>
   );
 }

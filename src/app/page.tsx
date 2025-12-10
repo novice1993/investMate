@@ -1,9 +1,12 @@
 "use client";
 
+import { AnimatePresence } from "motion/react";
 import { useState, useMemo, useCallback } from "react";
+import { SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
-import { SignalFeed } from "@/components/dashboard/SignalFeed";
+import { MobileMenu } from "@/components/dashboard/MobileMenu";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
 import { StockSearch } from "@/components/dashboard/StockSearch";
@@ -86,98 +89,157 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-light-gray-5">
-      <div className="container mx-auto p-6">
-        {/* 헤더 */}
-        <header className="mb-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold text-light-gray-90">실시간 모니터링</h1>
-              <p className="text-sm text-light-gray-50">선별 종목 실시간 시세 및 시그널 감시</p>
+      {/* 통합 Nav */}
+      <nav className="sticky top-0 z-50 border-b border-light-gray-20 bg-light-gray-0">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex items-center h-14 gap-4">
+            {/* 로고 */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-light-primary-50 flex items-center justify-center">
+                <span className="text-light-gray-0 font-bold text-sm">iM</span>
+              </div>
+              <span className="text-lg font-bold text-light-gray-90 hidden sm:block">investMate</span>
             </div>
-            <div className="flex items-center gap-4 flex-1 max-w-md">
+
+            {/* 검색바 (항상 표시, 반응형 너비) */}
+            <div className="flex-1 min-w-[120px] max-w-[160px] sm:max-w-[200px] md:max-w-[256px] md:flex-none md:w-64">
               <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
             </div>
-            <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+
+            {/* Desktop: 필터 버튼들 */}
+            <div className="hidden lg:flex items-center gap-2 flex-1">
+              <FilterTabs
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                totalCount={stocks.length}
+                rsiCount={rsiCount}
+                goldenCrossCount={goldenCrossCount}
+                volumeSpikeCount={volumeSpikeCount}
+              />
+            </div>
+
+            {/* 우측 영역 */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              {/* Desktop: 연결상태 */}
+              <div className="hidden md:block">
+                <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+              </div>
+
+              {/* 알림 (항상 표시) */}
+              <NotificationBell alerts={recentAlerts} stocks={stocks} />
+
+              {/* Mobile: 햄버거 메뉴 */}
+              <div className="lg:hidden">
+                <MobileMenu
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  totalCount={stocks.length}
+                  rsiCount={rsiCount}
+                  goldenCrossCount={goldenCrossCount}
+                  volumeSpikeCount={volumeSpikeCount}
+                  isConnected={isConnected}
+                  isKisConnected={isKisConnected}
+                />
+              </div>
+            </div>
           </div>
-        </header>
+        </div>
+      </nav>
 
-        {/* 필터 탭 */}
-        <FilterTabs
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          totalCount={stocks.length}
-          rsiCount={rsiCount}
-          goldenCrossCount={goldenCrossCount}
-          volumeSpikeCount={volumeSpikeCount}
-        />
-
-        {/* 에러 표시 */}
-        {error && (
-          <div className="mb-6 p-4 bg-light-danger-5 border border-light-danger-20 rounded-lg">
+      {/* 에러 표시 */}
+      {error && (
+        <div className="container mx-auto px-6 py-3">
+          <div className="p-4 bg-light-danger-5 border border-light-danger-20 rounded-lg">
             <p className="text-light-danger-60 text-sm">{error}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* 메인 컨텐츠 */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* 좌측: 종목 그리드 + 알림 피드 */}
-          <div className={selectedStock ? "col-span-8" : "col-span-12"}>
-            {/* 종목 그리드 */}
-            <section className="mb-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-64 bg-light-gray-0 rounded-lg border border-light-gray-20">
-                  <p className="text-light-gray-40">선별 종목 로딩 중...</p>
-                </div>
-              ) : filteredStocks.length === 0 ? (
-                <div className="flex items-center justify-center h-64 bg-light-gray-0 rounded-lg border border-light-gray-20">
-                  <p className="text-light-gray-40">{activeFilter === "all" ? "선별된 종목이 없습니다" : "해당 시그널 종목이 없습니다"}</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {filteredStocks.map((stock) => (
-                    <StockCard
-                      key={stock.stockCode}
-                      stock={stock}
-                      realtimePrice={prices.get(stock.stockCode)}
-                      signal={signals.get(stock.stockCode)}
-                      isSelected={selectedStock?.stock.stockCode === stock.stockCode}
-                      onClick={() => handleScreenedStockClick(stock)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* 실시간 알림 피드 */}
-            <SignalFeed alerts={recentAlerts} stocks={stocks} />
+      {/* 메인 컨텐츠 */}
+      <main className="container mx-auto px-4 md:px-6 py-4 md:py-6">
+        <div className="grid grid-cols-12 gap-4 md:gap-6">
+          {/* 좌측: 종목 그리드 */}
+          <div className={selectedStock ? "col-span-12 lg:col-span-8" : "col-span-12"}>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64 bg-light-gray-0 rounded-lg border border-light-gray-20">
+                <p className="text-light-gray-40">선별 종목 로딩 중...</p>
+              </div>
+            ) : filteredStocks.length === 0 ? (
+              <div className="flex items-center justify-center h-64 bg-light-gray-0 rounded-lg border border-light-gray-20">
+                <p className="text-light-gray-40">{activeFilter === "all" ? "선별된 종목이 없습니다" : "해당 시그널 종목이 없습니다"}</p>
+              </div>
+            ) : (
+              <div className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
+                {filteredStocks.map((stock) => (
+                  <StockCard
+                    key={stock.stockCode}
+                    stock={stock}
+                    realtimePrice={prices.get(stock.stockCode)}
+                    signal={signals.get(stock.stockCode)}
+                    isSelected={selectedStock?.stock.stockCode === stock.stockCode}
+                    onClick={() => handleScreenedStockClick(stock)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* 우측: 상세 패널 (종목 선택 시) */}
-          {selectedStock && (
-            <div className="col-span-4">
-              {selectedStock.type === "screened" ? (
-                <StockDetailPanel
-                  stock={selectedStock.stock}
-                  realtimePrice={prices.get(selectedStock.stock.stockCode)}
-                  signal={signals.get(selectedStock.stock.stockCode)}
-                  onClose={() => setSelectedStock(null)}
-                />
-              ) : (
-                <StockDetailPanel
-                  stock={{
-                    ...selectedStock.stock,
-                    roe: 0,
-                    debtRatio: 0,
-                    operatingMargin: 0,
-                  }}
-                  isSearchedStock
-                  onClose={() => setSelectedStock(null)}
-                />
-              )}
-            </div>
-          )}
+          {/* 우측: 상세 패널 (종목 선택 시) - Desktop: 우측 고정, Mobile: 전체화면 모달 */}
+          <AnimatePresence>
+            {selectedStock && (
+              <>
+                {/* Mobile: 전체화면 오버레이 */}
+                <div className="lg:hidden fixed inset-0 z-50 bg-light-gray-5 overflow-y-auto">
+                  <div className="p-4">
+                    {selectedStock.type === "screened" ? (
+                      <StockDetailPanel
+                        stock={selectedStock.stock}
+                        realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                        signal={signals.get(selectedStock.stock.stockCode)}
+                        onClose={() => setSelectedStock(null)}
+                      />
+                    ) : (
+                      <StockDetailPanel
+                        stock={{
+                          ...selectedStock.stock,
+                          roe: 0,
+                          debtRatio: 0,
+                          operatingMargin: 0,
+                        }}
+                        isSearchedStock
+                        onClose={() => setSelectedStock(null)}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Desktop: 우측 패널 */}
+                <SlideIn direction="right" className="hidden lg:block col-span-4">
+                  {selectedStock.type === "screened" ? (
+                    <StockDetailPanel
+                      stock={selectedStock.stock}
+                      realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                      signal={signals.get(selectedStock.stock.stockCode)}
+                      onClose={() => setSelectedStock(null)}
+                    />
+                  ) : (
+                    <StockDetailPanel
+                      stock={{
+                        ...selectedStock.stock,
+                        roe: 0,
+                        debtRatio: 0,
+                        operatingMargin: 0,
+                      }}
+                      isSearchedStock
+                      onClose={() => setSelectedStock(null)}
+                    />
+                  )}
+                </SlideIn>
+              </>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

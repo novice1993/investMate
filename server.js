@@ -209,8 +209,9 @@ app.prepare().then(async () => {
   kisClient.onDataReceived = (data) => {
     if (!data.stockCode) return;
 
-    // 1. 실시간 데이터를 해당 종목 구독 클라이언트들에게 전송
-    io.to(`stock:${data.stockCode}`).emit("price-update", data);
+    // 1. 실시간 데이터를 모든 클라이언트에게 브로드캐스트
+    // - 서버 주도형 설계: 선별 종목 40개는 클라이언트 구독 없이 일괄 전송
+    io.emit("price-update", data);
 
     // 2. 실시간 데이터를 캐시에 반영
     updateRealtimePrice(data);

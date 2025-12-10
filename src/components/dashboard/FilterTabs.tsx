@@ -52,7 +52,7 @@ export function FilterTabs({ activeFilter, onFilterChange, totalCount, rsiCount,
   };
 
   return (
-    <div className="mb-6 flex gap-2 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap">
       {FILTERS.map(({ key, label, badgeColor }) => {
         const isActive = activeFilter === key;
         const count = counts[key];
@@ -62,9 +62,9 @@ export function FilterTabs({ activeFilter, onFilterChange, totalCount, rsiCount,
             key={key}
             onClick={() => onFilterChange(key)}
             className={`
-              px-4 py-2 rounded-lg text-sm font-medium transition-all
-              flex items-center gap-2
-              ${isActive ? "bg-light-primary-50 text-light-gray-0 shadow-md" : "bg-light-gray-0 text-light-gray-60 hover:bg-light-gray-10 border border-light-gray-20"}
+              px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+              flex items-center gap-1.5
+              ${isActive ? "bg-light-primary-50 text-light-gray-0" : "bg-light-gray-5 text-light-gray-60 hover:bg-light-gray-10"}
             `}
           >
             {label}

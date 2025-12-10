@@ -161,7 +161,7 @@ export function StockSearch({ onSelect, screenedStockCodes = new Set() }: StockS
 
       {/* 검색 결과 드롭다운 */}
       {isOpen && (
-        <div ref={dropdownRef} className="absolute z-50 w-full mt-1 bg-light-gray-0 border border-light-gray-20 rounded-lg shadow-lg overflow-hidden">
+        <div ref={dropdownRef} className="absolute z-50 min-w-[240px] w-full sm:w-72 mt-1 bg-light-gray-0 border border-light-gray-20 rounded-lg shadow-lg overflow-hidden">
           <ul ref={listRef} className="max-h-64 overflow-y-auto">
             {results.map((stock, index) => {
               const isScreened = screenedStockCodes.has(stock.stockCode);
@@ -172,20 +172,18 @@ export function StockSearch({ onSelect, screenedStockCodes = new Set() }: StockS
                   <button
                     onClick={() => handleSelect(stock)}
                     onMouseEnter={() => setActiveIndex(index)}
-                    className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors
-                      ${isActive ? "bg-light-primary-5" : "hover:bg-light-gray-5"}
-                    `}
+                    className={`w-full px-3 py-2.5 text-left transition-colors ${isActive ? "bg-light-primary-5" : "hover:bg-light-gray-5"}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-light-gray-90">{stock.corpName}</span>
-                          {isScreened && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-light-primary-50 text-light-gray-0 rounded">실시간</span>}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium text-sm text-light-gray-90 truncate">{stock.corpName}</span>
+                          {isScreened && <span className="px-1 py-0.5 text-[10px] font-medium bg-light-primary-50 text-light-gray-0 rounded shrink-0">실시간</span>}
                         </div>
                         <span className="text-xs text-light-gray-50">{stock.stockCode}</span>
                       </div>
+                      <span className="text-xs text-light-gray-40 shrink-0">{formatMarketCap(stock.marketCap)}</span>
                     </div>
-                    <span className="text-xs text-light-gray-40">{formatMarketCap(stock.marketCap)}</span>
                   </button>
                 </li>
               );

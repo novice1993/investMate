@@ -65,7 +65,7 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
   }, [priceInfo.changeSign]);
 
   return (
-    <div className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4 sticky top-6">
+    <div className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4 sticky top-16">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <div>
