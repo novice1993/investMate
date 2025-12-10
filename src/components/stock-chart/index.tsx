@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { StockPriceChart, type RealtimeData } from "./StockPriceChart";
-import { useDailyPrices } from "./useDailyPrices";
-import { useRealtimePrice } from "./useRealtimePrice";
+import { useQueryErrorResetBoundary } from "@tanstack/react-query";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { ChartSkeleton } from "@/components/dashboard/skeletons";
+import { StockChartContent } from "./StockChartContent";
 
 // ============================================================================
 // Types
@@ -23,54 +24,46 @@ interface StockChartCardProps {
 /**
  * 주가 차트 카드 (Container)
  *
- * - 일봉 데이터 조회 (useDailyPrices)
- * - 실시간 데이터 표시 (useRealtimePrice) - enableRealtime=true일 때만
- * - 개별 구독 없음: 서버에서 40개 종목 일괄 구독 중
+ * - Suspense + ErrorBoundary 패턴 적용
+ * - 로딩: ChartSkeleton 애니메이션
+ * - 에러: 재시도 버튼 제공
  */
 export function StockChartCard({ stockCode, corpName, enableRealtime = false }: StockChartCardProps) {
-  const { candleData, isLoading, error } = useDailyPrices(stockCode);
-  const { prices } = useRealtimePrice();
-
-  // 실시간 데이터를 RealtimeData 형식으로 변환
-  const realtimeData: RealtimeData[] = useMemo(() => {
-    if (!enableRealtime) return [];
-
-    const price = prices.get(stockCode);
-    if (!price) return [];
-
-    return [
-      {
-        timestamp: price.timestamp,
-        price: price.price,
-        volume: price.volume,
-      },
-    ];
-  }, [enableRealtime, prices, stockCode]);
-
-  // 로딩 상태
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <p className="text-light-gray-40">로딩 중...</p>
-      </div>
-    );
-  }
-
-  // 에러 상태
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <p className="text-light-danger-50">{error}</p>
-      </div>
-    );
-  }
+  const { reset } = useQueryErrorResetBoundary();
 
   return (
     <div className="h-full flex flex-col">
       {corpName && <h3 className="text-sm font-medium text-light-gray-70 mb-2">{corpName}</h3>}
       <div className="flex-1">
-        <StockPriceChart candleData={candleData} realtimeData={realtimeData} />
+        <ErrorBoundary resetKeys={[stockCode]} onReset={reset} fallbackRender={({ resetErrorBoundary }) => <ChartErrorFallback onRetry={resetErrorBoundary} />}>
+          <Suspense fallback={<ChartSkeleton />}>
+            <StockChartContent stockCode={stockCode} enableRealtime={enableRealtime} />
+          </Suspense>
+        </ErrorBoundary>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Error Fallback
+// ============================================================================
+
+function ChartErrorFallback({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center p-4 bg-light-gray-5 rounded-lg">
+      <svg className="w-8 h-8 text-light-danger-40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
+      <p className="text-sm text-light-gray-50 mb-3">차트를 불러올 수 없습니다</p>
+      <button onClick={onRetry} className="px-3 py-1.5 text-xs font-medium text-light-gray-60 bg-light-gray-0 border border-light-gray-30 rounded-lg hover:bg-light-gray-10 transition-colors">
+        다시 시도
+      </button>
     </div>
   );
 }

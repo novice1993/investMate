@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { jsonHttpClient } from "@/shared/lib/http";
 
 // ============================================================================
@@ -28,18 +28,14 @@ interface ApiResponse {
 // Fetcher
 // ============================================================================
 
-async function fetchFinancialMetrics(stockCode: string): Promise<FinancialMetrics | null> {
-  try {
-    const result = await jsonHttpClient.get<ApiResponse>(`/api/financial/metrics/${stockCode}`);
+async function fetchFinancialMetrics(stockCode: string): Promise<FinancialMetrics> {
+  const result = await jsonHttpClient.get<ApiResponse>(`/api/financial/metrics/${stockCode}`);
 
-    if (!result.success || !result.data) {
-      return null;
-    }
-
-    return result.data;
-  } catch {
-    return null;
+  if (!result.success || !result.data) {
+    throw new Error(result.error || "재무지표 데이터를 불러올 수 없습니다");
   }
+
+  return result.data;
 }
 
 // ============================================================================
@@ -47,16 +43,16 @@ async function fetchFinancialMetrics(stockCode: string): Promise<FinancialMetric
 // ============================================================================
 
 /**
- * 종목별 재무지표 조회 훅 (tanstack-query)
+ * 종목별 재무지표 조회 훅 (Suspense 버전)
  *
- * - 캐싱: 5분 (staleTime)
- * - 자동 리페치: 비활성화
+ * - Suspense와 함께 사용
+ * - 로딩 중 컴포넌트 suspend
+ * - 에러 시 ErrorBoundary로 전파
  */
-export function useFinancialMetrics(stockCode: string | undefined) {
-  return useQuery({
+export function useFinancialMetricsSuspense(stockCode: string) {
+  return useSuspenseQuery({
     queryKey: ["financial-metrics", stockCode],
-    queryFn: () => fetchFinancialMetrics(stockCode!),
-    enabled: !!stockCode,
+    queryFn: () => fetchFinancialMetrics(stockCode),
     staleTime: 5 * 60 * 1000, // 5분
     gcTime: 10 * 60 * 1000, // 10분
     refetchOnWindowFocus: false,
