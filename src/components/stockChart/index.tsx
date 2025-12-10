@@ -3,7 +3,7 @@
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { ChartSkeleton } from "@/components/dashboard/skeletons";
+import { ChartSkeleton } from "@/components/skeletons";
 import { StockChartContent } from "./StockChartContent";
 
 // ============================================================================

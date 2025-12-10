@@ -2,8 +2,8 @@
 
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
-import { useDailyPrices } from "@/components/stock-chart/useDailyPrices";
 import { colorTokens } from "@/styles/tokens";
+import { useDailyPrices } from "./useDailyPrices";
 
 // ============================================================================
 // Types

@@ -3,12 +3,12 @@
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Suspense, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { StockChartCard } from "@/components/stock-chart";
+import { MetricsSkeleton } from "@/components/skeletons";
+import { StockChartCard } from "@/components/stockChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
 import { FinancialMetricsContent } from "./FinancialMetricsContent";
-import { MetricsSkeleton } from "./skeletons";
 
 // ============================================================================
 // Types

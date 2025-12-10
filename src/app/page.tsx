@@ -2,7 +2,7 @@
 
 import { AnimatePresence } from "motion/react";
 import { useState, useMemo, useCallback } from "react";
-import { SlideIn } from "@/components/animation";
+import { AnimatedList, AnimatedListItem, SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
 import { MobileMenu } from "@/components/dashboard/MobileMenu";
@@ -10,7 +10,7 @@ import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
 import { StockSearch } from "@/components/dashboard/StockSearch";
-import { useRealtimePrice } from "@/components/stock-chart/useRealtimePrice";
+import { useRealtimePrice } from "@/components/stockChart/useRealtimePrice";
 import type { KospiStock } from "@/hooks/useKospiStocks";
 import { useScreenedStocks, type ScreenedStock } from "@/hooks/useScreenedStocks";
 import { useSignalAlert } from "@/hooks/useSignalAlert";
@@ -169,18 +169,19 @@ export default function DashboardPage() {
                 <p className="text-light-gray-40">{activeFilter === "all" ? "선별된 종목이 없습니다" : "해당 시그널 종목이 없습니다"}</p>
               </div>
             ) : (
-              <div className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
+              <AnimatedList className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
                 {filteredStocks.map((stock) => (
-                  <StockCard
-                    key={stock.stockCode}
-                    stock={stock}
-                    realtimePrice={prices.get(stock.stockCode)}
-                    signal={signals.get(stock.stockCode)}
-                    isSelected={selectedStock?.stock.stockCode === stock.stockCode}
-                    onClick={() => handleScreenedStockClick(stock)}
-                  />
+                  <AnimatedListItem key={stock.stockCode} itemKey={stock.stockCode}>
+                    <StockCard
+                      stock={stock}
+                      realtimePrice={prices.get(stock.stockCode)}
+                      signal={signals.get(stock.stockCode)}
+                      isSelected={selectedStock?.stock.stockCode === stock.stockCode}
+                      onClick={() => handleScreenedStockClick(stock)}
+                    />
+                  </AnimatedListItem>
                 ))}
-              </div>
+              </AnimatedList>
             )}
           </div>
 

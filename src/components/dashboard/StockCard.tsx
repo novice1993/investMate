@@ -1,10 +1,10 @@
 "use client";
 
 import { memo } from "react";
+import { MiniChart } from "@/components/stockChart/MiniChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
-import { MiniChart } from "./MiniChart";
 import { PriceDisplay } from "./PriceDisplay";
 import { SignalBadges } from "./SignalBadges";
 
