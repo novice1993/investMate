@@ -3,7 +3,6 @@
 import { AnimatePresence } from "motion/react";
 import { useState, useMemo, useCallback } from "react";
 import { SlideIn } from "@/components/animation";
-import { Navigation } from "@/components/common/Navigation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
 import { SignalFeed } from "@/components/dashboard/SignalFeed";
@@ -87,20 +86,19 @@ export default function DashboardPage() {
     });
   }, [stocks, activeFilter, signals]);
 
-  // Navigation 우측 슬롯
-  const navRightSlot = (
-    <>
-      <div className="w-72">
-        <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
-      </div>
-      <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
-    </>
-  );
-
   return (
     <div className="min-h-screen bg-light-gray-5">
-      {/* 네비게이션 */}
-      <Navigation rightSlot={navRightSlot} />
+      {/* 상단 툴바: 검색 + 연결상태 */}
+      <div className="border-b border-light-gray-20 bg-light-gray-0">
+        <div className="container mx-auto px-4 md:px-6 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 max-w-md">
+              <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
+            </div>
+            <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+          </div>
+        </div>
+      </div>
 
       {/* 실시간 알림 피드 */}
       <div className="border-b border-light-gray-20 bg-light-gray-0">
