@@ -61,7 +61,7 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
     <div className="relative" ref={dropdownRef}>
       {/* 알림 버튼 */}
       <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-lg hover:bg-light-gray-5 transition-colors" aria-label={`알림 ${unreadCount}개`}>
-        <svg className="w-5 h-5 text-light-gray-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-6 h-6 text-light-gray-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -72,7 +72,7 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
 
         {/* 알림 뱃지 */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold text-light-gray-0 bg-light-danger-50 rounded-full">
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 flex items-center justify-center text-[10px] font-bold text-light-gray-0 bg-light-danger-50 rounded-full">
             {unreadCount}
           </span>
         )}

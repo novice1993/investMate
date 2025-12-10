@@ -5,6 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
+import { MobileMenu } from "@/components/dashboard/MobileMenu";
 import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
@@ -88,7 +89,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-light-gray-5">
-      {/* 통합 Nav: 로고 + 검색 + 필터 + 연결상태 + 알림 */}
+      {/* 통합 Nav */}
       <nav className="sticky top-0 z-50 border-b border-light-gray-20 bg-light-gray-0">
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex items-center h-14 gap-4">
@@ -97,16 +98,16 @@ export default function DashboardPage() {
               <div className="w-8 h-8 rounded-lg bg-light-primary-50 flex items-center justify-center">
                 <span className="text-light-gray-0 font-bold text-sm">iM</span>
               </div>
-              <span className="text-lg font-bold text-light-gray-90">investMate</span>
+              <span className="text-lg font-bold text-light-gray-90 hidden sm:block">investMate</span>
             </div>
 
-            {/* 검색바 */}
-            <div className="w-64 shrink-0">
+            {/* 검색바 (항상 표시, 반응형 너비) */}
+            <div className="flex-1 min-w-[120px] max-w-[160px] sm:max-w-[200px] md:max-w-[256px] md:flex-none md:w-64">
               <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
             </div>
 
-            {/* 필터 버튼들 */}
-            <div className="flex items-center gap-2 flex-1">
+            {/* Desktop: 필터 버튼들 */}
+            <div className="hidden lg:flex items-center gap-2 flex-1">
               <FilterTabs
                 activeFilter={activeFilter}
                 onFilterChange={setActiveFilter}
@@ -117,10 +118,29 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* 연결상태 + 알림 */}
-            <div className="flex items-center gap-3 shrink-0">
-              <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+            {/* 우측 영역 */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              {/* Desktop: 연결상태 */}
+              <div className="hidden md:block">
+                <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+              </div>
+
+              {/* 알림 (항상 표시) */}
               <NotificationBell alerts={recentAlerts} stocks={stocks} />
+
+              {/* Mobile: 햄버거 메뉴 */}
+              <div className="lg:hidden">
+                <MobileMenu
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  totalCount={stocks.length}
+                  rsiCount={rsiCount}
+                  goldenCrossCount={goldenCrossCount}
+                  volumeSpikeCount={volumeSpikeCount}
+                  isConnected={isConnected}
+                  isKisConnected={isKisConnected}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -136,10 +156,10 @@ export default function DashboardPage() {
       )}
 
       {/* 메인 컨텐츠 */}
-      <main className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-12 gap-6">
+      <main className="container mx-auto px-4 md:px-6 py-4 md:py-6">
+        <div className="grid grid-cols-12 gap-4 md:gap-6">
           {/* 좌측: 종목 그리드 */}
-          <div className={selectedStock ? "col-span-8" : "col-span-12"}>
+          <div className={selectedStock ? "col-span-12 lg:col-span-8" : "col-span-12"}>
             {isLoading ? (
               <div className="flex items-center justify-center h-64 bg-light-gray-0 rounded-lg border border-light-gray-20">
                 <p className="text-light-gray-40">선별 종목 로딩 중...</p>
@@ -149,7 +169,7 @@ export default function DashboardPage() {
                 <p className="text-light-gray-40">{activeFilter === "all" ? "선별된 종목이 없습니다" : "해당 시그널 종목이 없습니다"}</p>
               </div>
             ) : (
-              <div className={`grid gap-4 ${selectedStock ? "grid-cols-2" : "grid-cols-3"}`}>
+              <div className={`grid gap-3 md:gap-4 ${selectedStock ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
                 {filteredStocks.map((stock) => (
                   <StockCard
                     key={stock.stockCode}
@@ -164,30 +184,58 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* 우측: 상세 패널 (종목 선택 시) */}
+          {/* 우측: 상세 패널 (종목 선택 시) - Desktop: 우측 고정, Mobile: 전체화면 모달 */}
           <AnimatePresence>
             {selectedStock && (
-              <SlideIn direction="right" className="col-span-4">
-                {selectedStock.type === "screened" ? (
-                  <StockDetailPanel
-                    stock={selectedStock.stock}
-                    realtimePrice={prices.get(selectedStock.stock.stockCode)}
-                    signal={signals.get(selectedStock.stock.stockCode)}
-                    onClose={() => setSelectedStock(null)}
-                  />
-                ) : (
-                  <StockDetailPanel
-                    stock={{
-                      ...selectedStock.stock,
-                      roe: 0,
-                      debtRatio: 0,
-                      operatingMargin: 0,
-                    }}
-                    isSearchedStock
-                    onClose={() => setSelectedStock(null)}
-                  />
-                )}
-              </SlideIn>
+              <>
+                {/* Mobile: 전체화면 오버레이 */}
+                <div className="lg:hidden fixed inset-0 z-50 bg-light-gray-5 overflow-y-auto">
+                  <div className="p-4">
+                    {selectedStock.type === "screened" ? (
+                      <StockDetailPanel
+                        stock={selectedStock.stock}
+                        realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                        signal={signals.get(selectedStock.stock.stockCode)}
+                        onClose={() => setSelectedStock(null)}
+                      />
+                    ) : (
+                      <StockDetailPanel
+                        stock={{
+                          ...selectedStock.stock,
+                          roe: 0,
+                          debtRatio: 0,
+                          operatingMargin: 0,
+                        }}
+                        isSearchedStock
+                        onClose={() => setSelectedStock(null)}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Desktop: 우측 패널 */}
+                <SlideIn direction="right" className="hidden lg:block col-span-4">
+                  {selectedStock.type === "screened" ? (
+                    <StockDetailPanel
+                      stock={selectedStock.stock}
+                      realtimePrice={prices.get(selectedStock.stock.stockCode)}
+                      signal={signals.get(selectedStock.stock.stockCode)}
+                      onClose={() => setSelectedStock(null)}
+                    />
+                  ) : (
+                    <StockDetailPanel
+                      stock={{
+                        ...selectedStock.stock,
+                        roe: 0,
+                        debtRatio: 0,
+                        operatingMargin: 0,
+                      }}
+                      isSearchedStock
+                      onClose={() => setSelectedStock(null)}
+                    />
+                  )}
+                </SlideIn>
+              </>
             )}
           </AnimatePresence>
         </div>
