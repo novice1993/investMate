@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from "react";
 import { SlideIn } from "@/components/animation";
 import { ConnectionStatus } from "@/components/dashboard/ConnectionStatus";
 import { FilterTabs } from "@/components/dashboard/FilterTabs";
-import { SignalFeed } from "@/components/dashboard/SignalFeed";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { StockCard } from "@/components/dashboard/StockCard";
 import { StockDetailPanel } from "@/components/dashboard/StockDetailPanel";
 import { StockSearch } from "@/components/dashboard/StockSearch";
@@ -88,38 +88,43 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-light-gray-5">
-      {/* 상단 툴바: 검색 + 연결상태 */}
-      <div className="border-b border-light-gray-20 bg-light-gray-0">
-        <div className="container mx-auto px-4 md:px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 max-w-md">
+      {/* 통합 Nav: 로고 + 검색 + 필터 + 연결상태 + 알림 */}
+      <nav className="sticky top-0 z-50 border-b border-light-gray-20 bg-light-gray-0">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex items-center h-14 gap-4">
+            {/* 로고 */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-light-primary-50 flex items-center justify-center">
+                <span className="text-light-gray-0 font-bold text-sm">iM</span>
+              </div>
+              <span className="text-lg font-bold text-light-gray-90">investMate</span>
+            </div>
+
+            {/* 검색바 */}
+            <div className="w-64 shrink-0">
               <StockSearch onSelect={handleSearchSelect} screenedStockCodes={screenedStockCodes} />
             </div>
-            <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+
+            {/* 필터 버튼들 */}
+            <div className="flex items-center gap-2 flex-1">
+              <FilterTabs
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                totalCount={stocks.length}
+                rsiCount={rsiCount}
+                goldenCrossCount={goldenCrossCount}
+                volumeSpikeCount={volumeSpikeCount}
+              />
+            </div>
+
+            {/* 연결상태 + 알림 */}
+            <div className="flex items-center gap-3 shrink-0">
+              <ConnectionStatus isConnected={isConnected} isKisConnected={isKisConnected} />
+              <NotificationBell alerts={recentAlerts} stocks={stocks} />
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* 실시간 알림 피드 */}
-      <div className="border-b border-light-gray-20 bg-light-gray-0">
-        <div className="container mx-auto px-6 py-2">
-          <SignalFeed alerts={recentAlerts} stocks={stocks} />
-        </div>
-      </div>
-
-      {/* 필터 탭 */}
-      <div className="bg-light-gray-0 border-b border-light-gray-20">
-        <div className="container mx-auto px-6">
-          <FilterTabs
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            totalCount={stocks.length}
-            rsiCount={rsiCount}
-            goldenCrossCount={goldenCrossCount}
-            volumeSpikeCount={volumeSpikeCount}
-          />
-        </div>
-      </div>
+      </nav>
 
       {/* 에러 표시 */}
       {error && (

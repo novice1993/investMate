@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Navigation } from "@/components/common/Navigation";
 import { Providers } from "./providers";
 
 import "@/styles/globals.css";
@@ -30,7 +29,6 @@ export default function RootLayout({
     <html lang="ko" className="h-full">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full bg-light-gray-5`}>
         <Providers>
-          <Navigation />
           <main>{children}</main>
         </Providers>
       </body>
