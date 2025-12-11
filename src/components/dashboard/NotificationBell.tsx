@@ -11,6 +11,10 @@ import type { SignalAlert } from "@/hooks/useSignalAlert";
 interface NotificationBellProps {
   alerts: SignalAlert[];
   stocks: ScreenedStock[];
+  unreadCount: number;
+  onMarkAllAsRead: () => Promise<void>;
+  onMarkAsRead: (alertId: string) => Promise<void>;
+  onAlertClick?: (stockCode: string) => void;
 }
 
 // ============================================================================
@@ -27,7 +31,7 @@ const SIGNAL_CONFIG = {
 // Component
 // ============================================================================
 
-export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
+export function NotificationBell({ alerts, stocks, unreadCount, onMarkAllAsRead, onMarkAsRead, onAlertClick }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -54,13 +58,34 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
     };
   }, [isOpen]);
 
-  // 읽지 않은 알림 개수 (최근 10개 기준)
-  const unreadCount = Math.min(alerts.length, 99);
+  // 뱃지에 표시할 개수 (최대 99)
+  const displayCount = Math.min(unreadCount, 99);
+
+  // 전체 읽음 처리 핸들러
+  const handleMarkAllAsRead = async () => {
+    await onMarkAllAsRead();
+  };
+
+  // 개별 알림 클릭 핸들러
+  const handleAlertClick = async (alert: SignalAlert) => {
+    // 읽음 처리 (아직 안 읽은 경우 + id가 있는 경우)
+    if (!alert.isRead && alert.id) {
+      await onMarkAsRead(alert.id);
+    }
+
+    // 종목 포커싱
+    if (onAlertClick) {
+      onAlertClick(alert.stockCode);
+    }
+
+    // 드롭다운 닫기
+    setIsOpen(false);
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* 알림 버튼 */}
-      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-lg hover:bg-light-gray-5 transition-colors" aria-label={`알림 ${unreadCount}개`}>
+      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-lg hover:bg-light-gray-5 transition-colors" aria-label={`알림 ${displayCount}개`}>
         <svg className="w-6 h-6 text-light-gray-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
@@ -71,9 +96,9 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
         </svg>
 
         {/* 알림 뱃지 */}
-        {unreadCount > 0 && (
+        {displayCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 flex items-center justify-center text-[10px] font-bold text-light-gray-0 bg-light-danger-50 rounded-full">
-            {unreadCount}
+            {displayCount}
           </span>
         )}
       </button>
@@ -82,9 +107,16 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-light-gray-0 rounded-xl border border-light-gray-20 shadow-lg z-50 overflow-hidden">
           {/* 헤더 */}
-          <div className="px-4 py-3 border-b border-light-gray-10">
-            <h3 className="text-sm font-semibold text-light-gray-90">실시간 알림</h3>
-            <p className="text-xs text-light-gray-50 mt-0.5">최근 시그널 {alerts.length}개</p>
+          <div className="px-4 py-3 border-b border-light-gray-10 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-light-gray-90">시그널 알림</h3>
+              <p className="text-xs text-light-gray-50 mt-0.5">{unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : `총 ${alerts.length}개`}</p>
+            </div>
+            {unreadCount > 0 && (
+              <button onClick={handleMarkAllAsRead} className="text-xs text-light-primary-50 hover:text-light-primary-60 font-medium">
+                모두 읽음
+              </button>
+            )}
           </div>
 
           {/* 알림 목록 */}
@@ -96,7 +128,12 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
             ) : (
               <ul>
                 {alerts.slice(0, 20).map((alert, index) => (
-                  <AlertListItem key={`${alert.stockCode}-${alert.timestamp}-${index}`} alert={alert} stockName={stockNameMap.get(alert.stockCode) || alert.stockCode} />
+                  <AlertListItem
+                    key={alert.id || `${alert.stockCode}-${alert.timestamp}-${index}`}
+                    alert={alert}
+                    stockName={stockNameMap.get(alert.stockCode) || alert.stockCode}
+                    onClick={() => handleAlertClick(alert)}
+                  />
                 ))}
               </ul>
             )}
@@ -114,9 +151,10 @@ export function NotificationBell({ alerts, stocks }: NotificationBellProps) {
 interface AlertListItemProps {
   alert: SignalAlert;
   stockName: string;
+  onClick: () => void;
 }
 
-function AlertListItem({ alert, stockName }: AlertListItemProps) {
+function AlertListItem({ alert, stockName, onClick }: AlertListItemProps) {
   // 발생한 시그널 찾기
   const triggeredSignals = useMemo(() => {
     const signals: { key: keyof typeof SIGNAL_CONFIG; config: (typeof SIGNAL_CONFIG)[keyof typeof SIGNAL_CONFIG] }[] = [];
@@ -134,11 +172,17 @@ function AlertListItem({ alert, stockName }: AlertListItemProps) {
     return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }, [alert.timestamp]);
 
+  // 읽음 여부에 따른 스타일
+  const isRead = alert.isRead ?? false;
+
   return (
-    <li className="px-4 py-3 hover:bg-light-gray-5 transition-colors border-b border-light-gray-10 last:border-b-0">
+    <li className={`px-4 py-3 hover:bg-light-gray-5 transition-colors border-b border-light-gray-10 last:border-b-0 cursor-pointer ${isRead ? "opacity-60" : ""}`} onClick={onClick}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-light-gray-90 truncate">{stockName}</p>
+          <div className="flex items-center gap-1.5">
+            {!isRead && <span className="w-1.5 h-1.5 rounded-full bg-light-primary-50 shrink-0" />}
+            <p className={`text-sm font-medium text-light-gray-90 truncate ${isRead ? "" : "font-semibold"}`}>{stockName}</p>
+          </div>
           <div className="flex flex-wrap gap-1 mt-1">
             {triggeredSignals.map(({ key, config }) => (
               <span key={key} className={`text-xs font-medium ${config.textColor}`}>

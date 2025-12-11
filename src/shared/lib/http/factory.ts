@@ -67,5 +67,12 @@ export function createHttpClient(config: { requestInterceptors?: RequestIntercep
     delete: <TData>(url: string, options: HttpOptions = {}): Promise<TData> => {
       return executeRequest<TData>(url, { ...options, method: "DELETE" });
     },
+    patch: <TData, TBody = unknown>(url: string, body?: TBody, options: HttpOptions = {}): Promise<TData> => {
+      return executeRequest<TData>(url, {
+        ...options,
+        method: "PATCH",
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    },
   };
 }

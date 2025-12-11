@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { jsonHttpClient } from "@/shared/lib/http";
 import { useSocketInstance } from "@/shared/providers/SocketProvider";
 
 // ============================================================================
@@ -14,12 +15,15 @@ export interface SignalTriggers {
 }
 
 export interface SignalAlert {
+  id?: string;
   stockCode: string;
   triggers: SignalTriggers;
   rsi: { latest: number | null } | null;
   crossover: { type: string; shortMA: number | null; longMA: number | null } | null;
   volumeSpike: { ratio: number; isSpike: boolean } | null;
   timestamp: string;
+  isRead?: boolean;
+  isMock?: boolean;
 }
 
 export interface SignalState {
@@ -27,6 +31,8 @@ export interface SignalState {
   signals: Map<string, SignalTriggers>;
   /** 최근 알림 목록 (최대 50개) */
   recentAlerts: SignalAlert[];
+  /** 읽지 않은 알림 개수 */
+  unreadCount: number;
   /** RSI 과매도 종목 수 */
   rsiCount: number;
   /** 골든크로스 종목 수 */
@@ -44,7 +50,39 @@ interface UseSignalAlertOptions {
 
 interface UseSignalAlertReturn extends SignalState {
   isConnected: boolean;
+  isLoading: boolean;
   clearAlerts: () => void;
+  markAsRead: (alertId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+}
+
+// ============================================================================
+// Types (API Response)
+// ============================================================================
+
+interface SignalAlertFromAPI {
+  id: string;
+  stockCode: string;
+  triggers: SignalTriggers;
+  rsiValue: number | null;
+  volumeRatio: number | null;
+  isRead: boolean;
+  isMock: boolean;
+  createdAt: string;
+}
+
+interface FetchAlertsResponse {
+  success: boolean;
+  data?: {
+    alerts: SignalAlertFromAPI[];
+    unreadCount: number;
+  };
+  error?: string;
+}
+
+interface MarkAsReadResponse {
+  success: boolean;
+  message?: string;
 }
 
 // ============================================================================
@@ -54,21 +92,72 @@ interface UseSignalAlertReturn extends SignalState {
 const MAX_RECENT_ALERTS = 50;
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * API 응답 형식을 내부 SignalAlert 형식으로 변환
+ */
+function mapAPIAlertToSignalAlert(apiAlert: SignalAlertFromAPI): SignalAlert {
+  return {
+    id: apiAlert.id,
+    stockCode: apiAlert.stockCode,
+    triggers: apiAlert.triggers,
+    rsi: apiAlert.rsiValue !== null ? { latest: apiAlert.rsiValue } : null,
+    crossover: null,
+    volumeSpike: apiAlert.volumeRatio !== null ? { ratio: apiAlert.volumeRatio, isSpike: true } : null,
+    timestamp: apiAlert.createdAt,
+    isRead: apiAlert.isRead,
+    isMock: apiAlert.isMock,
+  };
+}
+
+// ============================================================================
 // Hook
 // ============================================================================
 
 /**
  * 실시간 시그널 알림 훅
+ * - 초기 로드: DB에서 저장된 알림 목록 불러오기
+ * - 실시간: Socket.io로 새 알림 수신 시 목록 앞에 추가
  * - SocketProvider의 공유 Socket 인스턴스 사용
- * - 상태는 훅 내부에서 관리 (구독 컴포넌트만 리렌더링)
  */
 export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAlertReturn {
   const { onNewAlert, stockNameMap } = options;
   const socket = useSocketInstance();
   const [signals, setSignals] = useState<Map<string, SignalTriggers>>(new Map());
   const [recentAlerts, setRecentAlerts] = useState<SignalAlert[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const initialLoadDone = useRef(false);
 
+  // DB에서 초기 알림 목록 로드
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    async function loadInitialAlerts() {
+      try {
+        const response = await jsonHttpClient.get<FetchAlertsResponse>("/api/signal-alerts");
+
+        if (response.success && response.data) {
+          const alerts = response.data.alerts.map(mapAPIAlertToSignalAlert);
+          setRecentAlerts(alerts);
+          setUnreadCount(response.data.unreadCount);
+          console.log("[SignalAlert] DB에서 초기 알림 로드:", alerts.length, "개");
+        }
+      } catch (error) {
+        console.error("[SignalAlert] 초기 알림 로드 실패:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadInitialAlerts();
+  }, []);
+
+  // Socket.io 이벤트 핸들링
   useEffect(() => {
     if (!socket) return;
 
@@ -96,7 +185,7 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
 
     // 실시간 시그널 알림 수신
     const handleSignalAlert = (alert: SignalAlert) => {
-      console.log("[SignalAlert] 수신:", alert);
+      console.log("[SignalAlert] 실시간 수신:", alert);
 
       // 시그널 상태 업데이트
       setSignals((prev) => {
@@ -117,11 +206,15 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
         return next;
       });
 
-      // 최근 알림 목록에 추가
+      // 최근 알림 목록 앞에 추가 (실시간 알림은 isRead: false)
+      const newAlert: SignalAlert = { ...alert, isRead: false };
       setRecentAlerts((prev) => {
-        const next = [alert, ...prev];
+        const next = [newAlert, ...prev];
         return next.slice(0, MAX_RECENT_ALERTS);
       });
+
+      // 읽지 않은 개수 증가
+      setUnreadCount((prev) => prev + 1);
 
       // 콜백 호출 (토스트 등)
       if (onNewAlert) {
@@ -151,15 +244,48 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
   // 알림 목록 초기화
   const clearAlerts = useCallback(() => {
     setRecentAlerts([]);
+    setUnreadCount(0);
+  }, []);
+
+  // 개별 알림 읽음 처리
+  const markAsRead = useCallback(async (alertId: string) => {
+    try {
+      const response = await jsonHttpClient.patch<MarkAsReadResponse>(`/api/signal-alerts/${alertId}`);
+
+      if (response.success) {
+        setRecentAlerts((prev) => prev.map((alert) => (alert.id === alertId ? { ...alert, isRead: true } : alert)));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error("[SignalAlert] 읽음 처리 실패:", error);
+    }
+  }, []);
+
+  // 전체 알림 읽음 처리
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const response = await jsonHttpClient.post<MarkAsReadResponse, object>("/api/signal-alerts", {});
+
+      if (response.success) {
+        setRecentAlerts((prev) => prev.map((alert) => ({ ...alert, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error("[SignalAlert] 전체 읽음 처리 실패:", error);
+    }
   }, []);
 
   return {
     signals,
     recentAlerts,
+    unreadCount,
     rsiCount,
     goldenCrossCount,
     volumeSpikeCount,
     isConnected,
+    isLoading,
     clearAlerts,
+    markAsRead,
+    markAllAsRead,
   };
 }

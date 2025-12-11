@@ -1,12 +1,17 @@
 import { createServer } from "http";
 import { parse } from "url";
+import nextEnv from "@next/env";
 import next from "next";
 import { Server } from "socket.io";
 import { startMockSignalEmitter } from "./src/core/dev/mock-signal.ts";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
 import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
 import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
+import { saveSignalAlert } from "./src/core/infrastructure/market/signal-alerts-repository.infra.ts";
 import { detectSignalTriggers, SIGNAL_TRIGGER_CONFIG } from "./src/core/services/signal-trigger.service.ts";
+
+// 환경변수 로드 (Next.js 앱 초기화 전에)
+nextEnv.loadEnvConfig(process.cwd());
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -229,14 +234,33 @@ app.prepare().then(async () => {
     // 5. 새로 발생한 시그널이 있을 때만 알림
     if (changedTriggers) {
       console.log(`[Signal] ${data.stockCode} 새 시그널:`, changedTriggers);
-      io.emit("signal-alert", {
+
+      const alertData = {
         stockCode: data.stockCode,
         triggers: changedTriggers,
         rsi: signalResult.rsi,
         crossover: signalResult.crossover,
         volumeSpike: signalResult.volumeSpike,
         timestamp: new Date().toISOString(),
-      });
+      };
+
+      // DB 저장 후 id 포함하여 emit
+      saveSignalAlert({
+        stockCode: data.stockCode,
+        triggers: changedTriggers,
+        rsiValue: signalResult.rsi?.latest ?? null,
+        volumeRatio: signalResult.volumeSpike?.ratio ?? null,
+      })
+        .then((savedAlert) => {
+          if (savedAlert) {
+            io.emit("signal-alert", { ...alertData, id: savedAlert.id });
+          } else {
+            console.error("[Signal] DB 저장 실패: 반환값 없음");
+          }
+        })
+        .catch((err) => {
+          console.error("[Signal] DB 저장 실패:", err);
+        });
     }
   };
 
@@ -324,15 +348,11 @@ app.prepare().then(async () => {
 
     // =========================================================================
     // [개발용] 모의 시그널 발생기
-    // - 장 마감 후 토스트 알림 등을 테스트할 때 주석 해제
+    // - 환경변수 MOCK_SIGNAL_ENABLED=true 일 때만 활성화
     // - interval: 발생 주기 (ms)
-    // - enabled: true로 설정하면 활성화
     // =========================================================================
-    if (dev) {
-      startMockSignalEmitter(io, {
-        enabled: true, // true로 변경하면 활성화
-        interval: 8000, // 8초마다 발생
-      });
-    }
+    startMockSignalEmitter(io, {
+      interval: 8000, // 8초마다 발생
+    });
   });
 });
