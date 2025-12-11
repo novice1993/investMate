@@ -1,11 +1,17 @@
 import { createServer } from "http";
 import { parse } from "url";
+import nextEnv from "@next/env";
 import next from "next";
 import { Server } from "socket.io";
+import { startMockSignalEmitter } from "./src/core/dev/mock-signal.ts";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
 import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
 import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
+import { saveSignalAlert } from "./src/core/infrastructure/market/signal-alerts-repository.infra.ts";
 import { detectSignalTriggers, SIGNAL_TRIGGER_CONFIG } from "./src/core/services/signal-trigger.service.ts";
+
+// 환경변수 로드 (Next.js 앱 초기화 전에)
+nextEnv.loadEnvConfig(process.cwd());
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -209,8 +215,9 @@ app.prepare().then(async () => {
   kisClient.onDataReceived = (data) => {
     if (!data.stockCode) return;
 
-    // 1. 실시간 데이터를 해당 종목 구독 클라이언트들에게 전송
-    io.to(`stock:${data.stockCode}`).emit("price-update", data);
+    // 1. 실시간 데이터를 모든 클라이언트에게 브로드캐스트
+    // - 서버 주도형 설계: 선별 종목 40개는 클라이언트 구독 없이 일괄 전송
+    io.emit("price-update", data);
 
     // 2. 실시간 데이터를 캐시에 반영
     updateRealtimePrice(data);
@@ -227,14 +234,33 @@ app.prepare().then(async () => {
     // 5. 새로 발생한 시그널이 있을 때만 알림
     if (changedTriggers) {
       console.log(`[Signal] ${data.stockCode} 새 시그널:`, changedTriggers);
-      io.emit("signal-alert", {
+
+      const alertData = {
         stockCode: data.stockCode,
         triggers: changedTriggers,
         rsi: signalResult.rsi,
         crossover: signalResult.crossover,
         volumeSpike: signalResult.volumeSpike,
         timestamp: new Date().toISOString(),
-      });
+      };
+
+      // DB 저장 후 id 포함하여 emit
+      saveSignalAlert({
+        stockCode: data.stockCode,
+        triggers: changedTriggers,
+        rsiValue: signalResult.rsi?.latest ?? null,
+        volumeRatio: signalResult.volumeSpike?.ratio ?? null,
+      })
+        .then((savedAlert) => {
+          if (savedAlert) {
+            io.emit("signal-alert", { ...alertData, id: savedAlert.id });
+          } else {
+            console.error("[Signal] DB 저장 실패: 반환값 없음");
+          }
+        })
+        .catch((err) => {
+          console.error("[Signal] DB 저장 실패:", err);
+        });
     }
   };
 
@@ -319,5 +345,14 @@ app.prepare().then(async () => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Next.js + Socket.io 서버 실행 중`);
+
+    // =========================================================================
+    // [개발용] 모의 시그널 발생기
+    // - 환경변수 MOCK_SIGNAL_ENABLED=true 일 때만 활성화
+    // - interval: 발생 주기 (ms)
+    // =========================================================================
+    startMockSignalEmitter(io, {
+      interval: 8000, // 8초마다 발생
+    });
   });
 });
