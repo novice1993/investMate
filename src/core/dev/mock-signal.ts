@@ -17,6 +17,19 @@
 
 import type { Server } from "socket.io";
 import { getScreenedStockCodes } from "../infrastructure/market/screened-stocks-repository.infra";
+import { saveSignalAlert } from "../infrastructure/market/signal-alerts-repository.infra";
+
+// ============================================================================
+// Environment Config
+// ============================================================================
+
+/**
+ * Mock 시그널 활성화 여부 확인 (함수 호출 시점에 평가)
+ * - 환경변수 로드 후 호출되어야 정확한 값 반환
+ */
+function isMockSignalEnabled(): boolean {
+  return process.env.MOCK_SIGNAL_ENABLED === "true";
+}
 
 // ============================================================================
 // Types
@@ -84,13 +97,16 @@ function generateMockSignal(stockCode: string): SignalAlert {
 
 /**
  * 모의 시그널 발생기 시작
+ * - 환경변수 MOCK_SIGNAL_ENABLED로 활성화 여부 결정
  * - 실제 선별 종목(Supabase)에서만 시그널 발생
+ * - 발생한 시그널은 DB에 isMock: true로 저장
  */
 export async function startMockSignalEmitter(io: Server, config: MockSignalConfig = {}): Promise<void> {
-  const { interval = 10000, enabled = true } = config;
+  const { interval = 10000 } = config;
 
-  if (!enabled) {
-    console.log("[MockSignal] 비활성화됨");
+  // 환경변수 기반으로 활성화 여부 결정
+  if (!isMockSignalEnabled()) {
+    console.log("[MockSignal] 비활성화됨 (MOCK_SIGNAL_ENABLED=false)");
     return;
   }
 
@@ -114,16 +130,34 @@ export async function startMockSignalEmitter(io: Server, config: MockSignalConfi
   console.log(`[MockSignal] ✅ 시작 - ${interval / 1000}초 간격`);
   console.log(`[MockSignal] 대상: 선별 종목 ${cachedStockCodes.length}개`);
 
-  intervalId = setInterval(() => {
+  intervalId = setInterval(async () => {
     // 랜덤 종목 선택 (선별 종목에서)
     const randomIndex = Math.floor(Math.random() * cachedStockCodes.length);
     const stockCode = cachedStockCodes[randomIndex];
 
-    // 모의 시그널 생성 및 발송
+    // 모의 시그널 생성
     const mockSignal = generateMockSignal(stockCode);
 
     console.log(`[MockSignal] 발생: ${stockCode}`, mockSignal.triggers);
-    io.emit("signal-alert", mockSignal);
+
+    // DB 저장 후 id 포함하여 emit
+    try {
+      const savedAlert = await saveSignalAlert({
+        stockCode,
+        triggers: mockSignal.triggers,
+        rsiValue: mockSignal.rsi?.latest ?? null,
+        volumeRatio: mockSignal.volumeSpike?.ratio ?? null,
+        isMock: true,
+      });
+
+      if (savedAlert) {
+        io.emit("signal-alert", { ...mockSignal, id: savedAlert.id, isMock: true });
+      } else {
+        console.error("[MockSignal] DB 저장 실패: 반환값 없음");
+      }
+    } catch (err) {
+      console.error("[MockSignal] DB 저장 실패:", err);
+    }
   }, interval);
 }
 

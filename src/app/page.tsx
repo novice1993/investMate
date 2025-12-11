@@ -79,7 +79,7 @@ export default function DashboardPage() {
   );
 
   // 시그널 알림 데이터
-  const { signals, recentAlerts, rsiCount, goldenCrossCount, volumeSpikeCount } = useSignalAlert({
+  const { signals, recentAlerts, unreadCount, rsiCount, goldenCrossCount, volumeSpikeCount, markAsRead, markAllAsRead } = useSignalAlert({
     onNewAlert: handleSignalAlert,
     stockNameMap,
   });
@@ -104,6 +104,17 @@ export default function DashboardPage() {
         setSelectedStock({ type: "screened", stock: screenedStock });
       } else {
         setSelectedStock({ type: "searched", stock: kospiStock });
+      }
+    },
+    [stocks]
+  );
+
+  // 알림 클릭 시 종목 포커싱 핸들러
+  const handleAlertStockClick = useCallback(
+    (stockCode: string) => {
+      const stock = stocks.find((s) => s.stockCode === stockCode);
+      if (stock) {
+        setSelectedStock({ type: "screened", stock });
       }
     },
     [stocks]
@@ -200,7 +211,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 알림 (항상 표시) */}
-              <NotificationBell alerts={recentAlerts} stocks={stocks} />
+              <NotificationBell alerts={recentAlerts} stocks={stocks} unreadCount={unreadCount} onMarkAllAsRead={markAllAsRead} onMarkAsRead={markAsRead} onAlertClick={handleAlertStockClick} />
 
               {/* Mobile: 햄버거 메뉴 */}
               <div className="lg:hidden">

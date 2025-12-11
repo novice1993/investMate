@@ -26,7 +26,7 @@ export function Providers({ children }: ProvidersProps) {
     <QueryClientProvider client={queryClient}>
       <SocketProvider>
         {children}
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="top-right" richColors closeButton offset="72px" />
       </SocketProvider>
     </QueryClientProvider>
   );
