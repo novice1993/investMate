@@ -8,6 +8,7 @@ import { StockChartCard } from "@/components/stockChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
+import { DisclosureSection } from "./DisclosureSection";
 import { FinancialMetricsContent } from "./FinancialMetricsContent";
 
 // ============================================================================
@@ -56,7 +57,7 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
   }, [priceInfo.changeSign]);
 
   return (
-    <div className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4 sticky top-16">
+    <div className="bg-light-gray-0 rounded-xl border border-light-gray-20 p-4 sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto scrollbar-thin">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -110,7 +111,7 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
       </div>
 
       {/* 펀더멘털 지표 */}
-      <div>
+      <div className="mb-4">
         <h3 className="text-sm font-semibold text-light-gray-70 mb-2">펀더멘털 지표</h3>
         {isSearchedStock ? (
           // 검색 종목: API 호출 필요 → Suspense/ErrorBoundary 적용
@@ -127,6 +128,12 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
             <MetricCard label="영업이익률" value={`${stock.operatingMargin.toFixed(1)}%`} />
           </div>
         )}
+      </div>
+
+      {/* 최근 공시 */}
+      <div>
+        <h3 className="text-sm font-semibold text-light-gray-70 mb-2">최근 공시</h3>
+        <DisclosureSection corpCode={stock.corpCode} />
       </div>
     </div>
   );
