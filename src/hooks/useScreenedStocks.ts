@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSocketInstance } from "@/shared/providers/SocketProvider";
 
 // ============================================================================
 // Types
@@ -27,13 +28,17 @@ interface UseScreenedStocksReturn {
 
 /**
  * 선별된 종목 목록을 가져오는 훅
+ *
+ * - 초기 마운트 시 종목 목록 fetch
+ * - 서버에서 screening-completed 이벤트 수신 시 자동 refetch
  */
 export function useScreenedStocks(): UseScreenedStocksReturn {
   const [stocks, setStocks] = useState<ScreenedStock[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const socket = useSocketInstance();
 
-  const fetchStocks = async () => {
+  const fetchStocks = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -52,11 +57,28 @@ export function useScreenedStocks(): UseScreenedStocksReturn {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
+  // 초기 마운트 시 fetch
   useEffect(() => {
     fetchStocks();
-  }, []);
+  }, [fetchStocks]);
+
+  // 스크리닝 완료 이벤트 수신 시 자동 refetch
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleScreeningCompleted = () => {
+      console.log("[useScreenedStocks] screening-completed 이벤트 수신, refetch 실행");
+      fetchStocks();
+    };
+
+    socket.on("screening-completed", handleScreeningCompleted);
+
+    return () => {
+      socket.off("screening-completed", handleScreeningCompleted);
+    };
+  }, [socket, fetchStocks]);
 
   return {
     stocks,

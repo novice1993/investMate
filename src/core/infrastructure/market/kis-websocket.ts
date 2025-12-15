@@ -256,6 +256,22 @@ export class KisWebSocketClient {
   }
 
   /**
+   * 여러 종목 일괄 구독 해제
+   */
+  unsubscribeMultiple(stockCodes: string[]): void {
+    if (!this.isConnected || !this.ws) {
+      console.error("[KIS WS] 연결되지 않았습니다.");
+      return;
+    }
+
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 해제 시작`);
+    for (const stockCode of stockCodes) {
+      this.unsubscribe(stockCode);
+    }
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 해제 완료`);
+  }
+
+  /**
    * 실시간 데이터 수신 시 호출될 콜백
    * server.js에서 이 콜백을 설정하면, KIS에서 데이터가 올 때마다 호출됨
    */

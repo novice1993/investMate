@@ -9,6 +9,7 @@
  * 5. 시가총액 기준 Top N 선별
  */
 
+import { appEvents, APP_EVENTS, ScreeningCompletedPayload } from "@/core/events";
 import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-stream.infra";
 import { getLatestFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
 import { replaceScreenedStocks } from "@/core/infrastructure/market/screened-stocks-repository.infra";
@@ -56,6 +57,16 @@ export async function runSignalScreeningWorkflow(): Promise<SignalScreeningWorkf
     await replaceScreenedStocks(screenedStocks);
 
     console.log(`[Stock Screening Workflow] Final result: ${screenedStocks.length} stocks screened and saved`);
+
+    // 6. 스크리닝 완료 이벤트 발행 (서버에서 KIS 구독 갱신 + 클라이언트 알림)
+    const stockCodes = screenedStocks.map((s) => s.stockCode);
+    const eventPayload: ScreeningCompletedPayload = {
+      screenedCount: screenedStocks.length,
+      stockCodes,
+      completedAt: new Date().toISOString(),
+    };
+    appEvents.emit(APP_EVENTS.SCREENING_COMPLETED, eventPayload);
+    console.log(`[Stock Screening Workflow] Emitted ${APP_EVENTS.SCREENING_COMPLETED} event`);
 
     return createSuccessResult(corpMappings.length, screenedStocks.length, screenedStocks, startTime);
   } catch (error) {
