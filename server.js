@@ -4,10 +4,12 @@ import nextEnv from "@next/env";
 import next from "next";
 import { Server } from "socket.io";
 import { startMockSignalEmitter } from "./src/core/dev/mock-signal.ts";
+import { appEvents, APP_EVENTS } from "./src/core/events/index.ts";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
 import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
 import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
 import { saveSignalAlert } from "./src/core/infrastructure/market/signal-alerts-repository.infra.ts";
+import { startKisTokenRefreshScheduler } from "./src/core/services/initialization.service.ts";
 import { detectSignalTriggers, SIGNAL_TRIGGER_CONFIG } from "./src/core/services/signal-trigger.service.ts";
 
 // 환경변수 로드 (Next.js 앱 초기화 전에)
@@ -24,6 +26,9 @@ const handle = app.getRequestHandler();
 // KIS WebSocket 클라이언트 생성
 const kisClient = new KisWebSocketClient();
 let isKisConnected = false;
+
+// 현재 서버에서 구독 중인 선별 종목 목록 (스크리닝 갱신 시 구독 교체용)
+let currentScreenedStockCodes = [];
 
 // ============================================================================
 // Signal State Management
@@ -161,9 +166,35 @@ async function initKisWebSocket() {
   if (stockCodes.length > 0) {
     console.log(`[Server] 선별 종목 ${stockCodes.length}개 자동 구독 시작...`);
     kisClient.subscribeMultiple(stockCodes);
+    currentScreenedStockCodes = stockCodes; // 현재 구독 목록 저장
   } else {
     console.log("[Server] 선별 종목 없음. 자동 구독 건너뜀.");
   }
+}
+
+/**
+ * 선별 종목 변경 시 KIS WebSocket 구독 갱신
+ * @param {string[]} newStockCodes - 새로 선별된 종목 코드 목록
+ */
+function updateKisSubscriptions(newStockCodes) {
+  if (!isKisConnected) {
+    console.log("[Server] KIS 연결 안됨. 구독 갱신 스킵.");
+    return;
+  }
+
+  // 1. 기존 구독 해제
+  if (currentScreenedStockCodes.length > 0) {
+    kisClient.unsubscribeMultiple(currentScreenedStockCodes);
+  }
+
+  // 2. 새 종목 구독
+  if (newStockCodes.length > 0) {
+    kisClient.subscribeMultiple(newStockCodes);
+  }
+
+  // 3. 현재 구독 목록 업데이트
+  currentScreenedStockCodes = newStockCodes;
+  console.log("[Server] ✅ KIS 구독 갱신 완료");
 }
 
 app.prepare().then(async () => {
@@ -191,6 +222,10 @@ app.prepare().then(async () => {
     console.error("[Server] ⚠️  실시간 시세 기능이 비활성화됩니다.");
     isKisConnected = false;
   }
+
+  // 4. KIS Access Token 주기적 갱신 스케줄러 시작 (7시간 주기)
+  startKisTokenRefreshScheduler();
+
   // HTTP Server 생성
   const server = createServer(async (req, res) => {
     try {
@@ -209,6 +244,26 @@ app.prepare().then(async () => {
       origin: dev ? "*" : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
       methods: ["GET", "POST"],
     },
+  });
+
+  // =========================================================================
+  // 종목 스크리닝 완료 이벤트 리스너
+  // - cron job에서 스크리닝 완료 시 이벤트 수신
+  // - KIS WebSocket 구독 갱신 + 클라이언트 알림
+  // =========================================================================
+  appEvents.on(APP_EVENTS.SCREENING_COMPLETED, (payload) => {
+    console.log("[Server] 스크리닝 완료 이벤트 수신:", payload.screenedCount, "개 종목");
+
+    // 1. KIS WebSocket 구독 갱신
+    updateKisSubscriptions(payload.stockCodes);
+
+    // 2. 클라이언트에 스크리닝 완료 알림 (종목 목록 refetch 트리거)
+    io.emit("screening-completed", {
+      screenedCount: payload.screenedCount,
+      completedAt: payload.completedAt,
+    });
+
+    console.log("[Server] ✅ 클라이언트에 screening-completed 이벤트 전송 완료");
   });
 
   // KIS WebSocket 데이터 수신 → 시그널 체크 + Socket.io 브로드캐스트

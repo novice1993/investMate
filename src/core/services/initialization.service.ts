@@ -63,6 +63,30 @@ export async function initializeSupabase() {
 }
 
 /**
+ * KIS REST API용 Access Token 주기적 갱신 스케줄러
+ *
+ * - Access Token 유효기간: 24시간
+ * - 갱신 가능 주기: 6시간
+ * - 설정 주기: 7시간 (안전 마진 포함)
+ *
+ * Note: WebSocket용 Approval Key는 연결 시 1회만 사용되므로 갱신 불필요
+ */
+const SEVEN_HOURS_MS = 7 * 60 * 60 * 1000;
+
+export function startKisTokenRefreshScheduler(): NodeJS.Timeout {
+  console.log("[KIS Token Scheduler] 7시간 주기 Access Token 갱신 스케줄러 시작");
+
+  return setInterval(async () => {
+    try {
+      await initializeKisAccessToken();
+      console.log("[KIS Token Scheduler] Access Token 갱신 완료");
+    } catch (error) {
+      console.error("[KIS Token Scheduler] Access Token 갱신 실패:", error);
+    }
+  }, SEVEN_HOURS_MS);
+}
+
+/**
  * 애플리케이션 종료 시 실행될 정리 작업을 수행합니다.
  *
  * Note: KIS 토큰은 DB에 영속 저장되어 서버 재시작 후 재사용됩니다.
