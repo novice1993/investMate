@@ -324,6 +324,12 @@ app.prepare().then(async () => {
     console.log(`[Server] KIS 연결 상태 변경: ${connected ? "연결됨" : "연결 해제"}`);
     isKisConnected = connected;
     io.emit("kis-status", { connected });
+
+    // 재연결 성공 시 선별 종목 재구독
+    if (connected && currentScreenedStockCodes.length > 0) {
+      console.log(`[Server] 재연결 후 ${currentScreenedStockCodes.length}개 종목 재구독...`);
+      kisClient.subscribeMultiple(currentScreenedStockCodes);
+    }
   };
 
   // 클라이언트별 구독 종목 추적
