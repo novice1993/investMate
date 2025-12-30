@@ -238,6 +238,8 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
         tooltip: {
           trigger: "axis",
           axisPointer: { type: "cross" },
+          appendToBody: true,
+          confine: false,
         },
         grid: [
           {
@@ -327,6 +329,8 @@ export function StockPriceChart({ candleData, realtimeData }: StockPriceChartPro
       return {
         tooltip: {
           trigger: "axis",
+          appendToBody: true,
+          confine: false,
           formatter: (params: { value: number; axisValue: string }[]) => {
             const param = params[0];
             return `${param.axisValue}<br/>가격: ${param.value.toLocaleString()}원`;
