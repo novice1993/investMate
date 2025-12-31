@@ -173,6 +173,24 @@ export function stopMockSignalEmitter(): void {
 }
 
 /**
+ * 캐시된 선별 종목 목록을 갱신합니다.
+ * 스크리닝 완료 시 호출하여 새 선별 종목으로 업데이트합니다.
+ */
+export async function refreshCachedStockCodes(): Promise<void> {
+  if (!isMockSignalEnabled()) {
+    return;
+  }
+
+  try {
+    const newStockCodes = await getScreenedStockCodes();
+    cachedStockCodes = newStockCodes;
+    console.log(`[MockSignal] ✅ 캐시 갱신 완료: ${cachedStockCodes.length}개 종목`);
+  } catch (error) {
+    console.error("[MockSignal] ❌ 캐시 갱신 실패:", error);
+  }
+}
+
+/**
  * 즉시 모의 시그널 1회 발생 (테스트용)
  */
 export function emitMockSignalOnce(io: Server, stockCode?: string): SignalAlert | null {

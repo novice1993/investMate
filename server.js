@@ -3,10 +3,10 @@ import { parse } from "url";
 import nextEnv from "@next/env";
 import next from "next";
 import { Server } from "socket.io";
-import { startMockSignalEmitter } from "./src/core/dev/mock-signal.ts";
+import { startMockSignalEmitter, refreshCachedStockCodes } from "./src/core/dev/mock-signal.ts";
 import { appEvents, APP_EVENTS } from "./src/core/events/index.ts";
 import { KisWebSocketClient } from "./src/core/infrastructure/market/kis-websocket.ts";
-import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes } from "./src/core/infrastructure/market/price-cache.infra.ts";
+import { initializePriceCache, updateRealtimePrice, getPriceDataForSignal, getCachedStockCodes, refreshPriceCache } from "./src/core/infrastructure/market/price-cache.infra.ts";
 import { getScreenedStockCodes } from "./src/core/infrastructure/market/screened-stocks-repository.infra.ts";
 import { saveSignalAlert } from "./src/core/infrastructure/market/signal-alerts-repository.infra.ts";
 import { startKisTokenRefreshScheduler } from "./src/core/services/initialization.service.ts";
@@ -249,15 +249,32 @@ app.prepare().then(async () => {
   // =========================================================================
   // 종목 스크리닝 완료 이벤트 리스너
   // - cron job에서 스크리닝 완료 시 이벤트 수신
-  // - KIS WebSocket 구독 갱신 + 클라이언트 알림
+  // - KIS WebSocket 구독 갱신 + 메모리 캐시 동기화 + 클라이언트 알림
   // =========================================================================
-  appEvents.on(APP_EVENTS.SCREENING_COMPLETED, (payload) => {
+  appEvents.on(APP_EVENTS.SCREENING_COMPLETED, async (payload) => {
     console.log("[Server] 스크리닝 완료 이벤트 수신:", payload.screenedCount, "개 종목");
 
     // 1. KIS WebSocket 구독 갱신
     updateKisSubscriptions(payload.stockCodes);
 
-    // 2. 클라이언트에 스크리닝 완료 알림 (종목 목록 refetch 트리거)
+    // 2. 메모리 캐시 동기화 (새 선별 종목 기준으로 갱신)
+    try {
+      // 2-1. 가격 캐시 갱신
+      await refreshPriceCache();
+
+      // 2-2. 시그널 상태 갱신
+      signalState.clear();
+      initializeSignalState();
+
+      // 2-3. Mock 시그널용 캐시 갱신
+      await refreshCachedStockCodes();
+
+      console.log("[Server] ✅ 메모리 캐시 동기화 완료");
+    } catch (error) {
+      console.error("[Server] ❌ 메모리 캐시 동기화 실패:", error);
+    }
+
+    // 3. 클라이언트에 스크리닝 완료 알림 (종목 목록 refetch 트리거)
     io.emit("screening-completed", {
       screenedCount: payload.screenedCount,
       completedAt: payload.completedAt,

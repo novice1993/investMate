@@ -126,6 +126,17 @@ export function clearPriceCache(): void {
 }
 
 /**
+ * 가격 캐시를 갱신합니다.
+ * 스크리닝 완료 시 호출하여 새 선별 종목으로 캐시를 재구성합니다.
+ */
+export async function refreshPriceCache(): Promise<void> {
+  console.log("[PriceCache] 캐시 갱신 시작...");
+  clearPriceCache();
+  await initializePriceCache();
+  console.log("[PriceCache] ✅ 캐시 갱신 완료");
+}
+
+/**
  * 캐시 상태를 반환합니다.
  */
 export function getPriceCacheStats(): { stockCount: number; totalPrices: number } {
