@@ -11,7 +11,8 @@
     "lint": "next lint",
     "prepare": "husky",
     "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "mock:kis": "tsx scripts/mock-kis-server.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

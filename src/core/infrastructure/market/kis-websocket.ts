@@ -2,8 +2,19 @@ import WebSocket from "ws";
 import { RealtimePrice, ChangeSign } from "@/core/entities/stock-price.entity";
 import { getCached } from "@/shared/lib/utils/cache";
 
-const KIS_WS_URL = "ws://ops.koreainvestment.com:21000";
 const KIS_APPROVAL_KEY = "kis-approval-key";
+
+/**
+ * KIS WebSocket URL을 반환합니다.
+ * 환경변수 로드 이후에 호출되어야 하므로 함수로 분리
+ */
+function getKisWsUrl(): string {
+  const isMockMode = process.env.MOCK_KIS_WS_ENABLED === "true";
+  if (isMockMode) {
+    return `ws://localhost:${process.env.MOCK_KIS_WS_PORT || 21001}`;
+  }
+  return "ws://ops.koreainvestment.com:21000";
+}
 
 /**
  * KIS H0STCNT0 응답 필드 인덱스
@@ -55,17 +66,24 @@ export class KisWebSocketClient {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        // 1. Approval Key 가져오기 (initialization.service.ts에서 이미 캐시에 저장됨)
-        const approvalKey = getCached<string>(KIS_APPROVAL_KEY);
-        if (!approvalKey) {
-          throw new Error("Approval Key가 초기화되지 않았습니다.");
+        // 1. Approval Key 가져오기
+        // Mock 모드에서는 가짜 키 사용, 실제 모드에서는 캐시에서 조회
+        const isMockMode = process.env.MOCK_KIS_WS_ENABLED === "true";
+        if (isMockMode) {
+          this.approvalKey = "MOCK_APPROVAL_KEY";
+        } else {
+          const approvalKey = getCached<string>(KIS_APPROVAL_KEY);
+          if (!approvalKey) {
+            throw new Error("Approval Key가 초기화되지 않았습니다.");
+          }
+          this.approvalKey = approvalKey;
         }
-        this.approvalKey = approvalKey;
 
-        console.log("[KIS WS] 연결 시도...");
+        // 2. WebSocket URL 결정 및 연결
+        const wsUrl = getKisWsUrl();
+        console.log(`[KIS WS] 연결 시도... (Mock: ${isMockMode}, URL: ${wsUrl})`);
 
-        // 2. WebSocket 연결
-        this.ws = new WebSocket(KIS_WS_URL);
+        this.ws = new WebSocket(wsUrl);
 
         // 3. 연결 성공
         this.ws.on("open", () => {
