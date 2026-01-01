@@ -1,9 +1,10 @@
 "use client";
 
 import type { Ref } from "react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { MiniChart } from "@/components/stockChart/MiniChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
+import { isMarketOpen } from "@/core/services/market-hours.service";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
 import { PriceDisplay } from "./PriceDisplay";
@@ -31,6 +32,12 @@ export const StockCard = memo(function StockCard({ stock, realtimePrice, signal,
   // 활성 시그널 여부
   const hasSignal = signal && (signal.rsiOversold || signal.goldenCross || signal.volumeSpike);
 
+  // 개장 여부
+  const marketOpen = useMemo(() => isMarketOpen(), []);
+
+  // 실시간 표시: 개장 중이고 실시간 데이터가 있을 때만
+  const showLiveIndicator = marketOpen && realtimePrice;
+
   return (
     <article
       ref={ref}
@@ -42,14 +49,14 @@ export const StockCard = memo(function StockCard({ stock, realtimePrice, signal,
         ${isSelected ? "bg-light-primary-5 border-2 border-light-primary-50 shadow-lg" : "bg-light-gray-0 border border-light-gray-20 hover:border-light-gray-30"}
       `}
     >
-      {/* 실시간 표시 */}
-      {realtimePrice && <LiveIndicator />}
+      {/* 실시간 표시 (개장 중에만) */}
+      {showLiveIndicator && <LiveIndicator />}
 
       {/* 헤더: 종목명 + 코드 */}
       <CardHeader corpName={stock.corpName} stockCode={stock.stockCode} />
 
       {/* 가격 정보 */}
-      <PriceDisplay realtimePrice={realtimePrice} />
+      <PriceDisplay stockCode={stock.stockCode} realtimePrice={realtimePrice} />
 
       {/* 미니 차트 */}
       <div className="h-24 mb-4">
