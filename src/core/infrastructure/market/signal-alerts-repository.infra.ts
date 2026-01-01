@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/core/infrastructure/common/supabase.infra";
+import { getScreenedStockCodes } from "@/core/infrastructure/market/screened-stocks-repository.infra";
 
 /**
  * @fileoverview 시그널 알림 Supabase Repository
@@ -103,13 +104,22 @@ interface GetRecentAlertsOptions {
 
 /**
  * 최근 알림 목록을 조회합니다.
+ * - 현재 선별된 종목의 알림만 반환합니다.
  * - includeMock 기본값은 환경변수 MOCK_SIGNAL_ENABLED에 따라 결정
  */
 export async function getRecentAlerts(options: GetRecentAlertsOptions = {}): Promise<SignalAlertData[]> {
   const { limit = 50, includeMock = isMockSignalEnabled() } = options;
   const supabase = getSupabaseClient();
 
-  let query = supabase.from("signal_alerts").select("*").order("created_at", { ascending: false }).limit(limit);
+  // 현재 선별된 종목 코드 조회
+  const screenedCodes = await getScreenedStockCodes();
+
+  // 선별 종목이 없으면 빈 배열 반환
+  if (screenedCodes.length === 0) {
+    return [];
+  }
+
+  let query = supabase.from("signal_alerts").select("*").in("stock_code", screenedCodes).order("created_at", { ascending: false }).limit(limit);
 
   // Mock 알림 제외 (기본값)
   if (!includeMock) {
@@ -128,12 +138,21 @@ export async function getRecentAlerts(options: GetRecentAlertsOptions = {}): Pro
 
 /**
  * 읽지 않은 알림 개수를 조회합니다.
+ * - 현재 선별된 종목의 알림만 카운트합니다.
  * @param includeMock Mock 알림 포함 여부 (기본값: 환경변수 MOCK_SIGNAL_ENABLED)
  */
 export async function getUnreadCount(includeMock: boolean = isMockSignalEnabled()): Promise<number> {
   const supabase = getSupabaseClient();
 
-  let query = supabase.from("signal_alerts").select("*", { count: "exact", head: true }).eq("is_read", false);
+  // 현재 선별된 종목 코드 조회
+  const screenedCodes = await getScreenedStockCodes();
+
+  // 선별 종목이 없으면 0 반환
+  if (screenedCodes.length === 0) {
+    return 0;
+  }
+
+  let query = supabase.from("signal_alerts").select("*", { count: "exact", head: true }).in("stock_code", screenedCodes).eq("is_read", false);
 
   if (!includeMock) {
     query = query.eq("is_mock", false);
