@@ -74,3 +74,4 @@ function ChartErrorFallback({ onRetry }: { onRetry: () => void }) {
 
 export { StockPriceChart } from "./StockPriceChart";
 export type { CandleData, RealtimeData } from "./StockPriceChart";
+export { useDailyPrices } from "./useDailyPrices";

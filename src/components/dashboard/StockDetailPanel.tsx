@@ -4,8 +4,9 @@ import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Suspense, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { MetricsSkeleton } from "@/components/skeletons";
-import { StockChartCard } from "@/components/stockChart";
+import { StockChartCard, useDailyPrices } from "@/components/stockChart";
 import type { RealtimePrice } from "@/core/entities/stock-price.entity";
+import { isMarketOpen } from "@/core/services/market-hours.service";
 import type { ScreenedStock } from "@/hooks/useScreenedStocks";
 import type { SignalTriggers } from "@/hooks/useSignalAlert";
 import { DisclosureSection } from "./DisclosureSection";
@@ -30,19 +31,56 @@ interface StockDetailPanelProps {
 
 export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock = false, onClose }: StockDetailPanelProps) {
   const { reset } = useQueryErrorResetBoundary();
+  const { candleData } = useDailyPrices(stock.stockCode);
 
-  // 가격 정보
-  const priceInfo = useMemo(() => {
-    if (!realtimePrice) {
-      return { price: "-", change: "-", changeRate: "-", changeSign: "flat" as const };
-    }
+  // 개장 여부
+  const marketOpen = useMemo(() => isMarketOpen(), []);
+
+  // 마지막 일봉 종가 (폐장 시 사용)
+  const lastDailyPrice = useMemo(() => {
+    if (candleData.length === 0) return null;
+    const lastCandle = candleData[candleData.length - 1];
+    const prevCandle = candleData.length > 1 ? candleData[candleData.length - 2] : null;
+
+    const change = prevCandle ? lastCandle.close - prevCandle.close : 0;
+    const changeRate = prevCandle && prevCandle.close > 0 ? (change / prevCandle.close) * 100 : 0;
+
     return {
-      price: realtimePrice.price.toLocaleString(),
-      change: realtimePrice.change > 0 ? `+${realtimePrice.change.toLocaleString()}` : realtimePrice.change.toLocaleString(),
-      changeRate: realtimePrice.changeRate > 0 ? `+${realtimePrice.changeRate.toFixed(2)}%` : `${realtimePrice.changeRate.toFixed(2)}%`,
-      changeSign: realtimePrice.changeSign,
+      price: lastCandle.close,
+      change,
+      changeRate,
+      changeSign: change > 0 ? ("rise" as const) : change < 0 ? ("fall" as const) : ("flat" as const),
     };
-  }, [realtimePrice]);
+  }, [candleData]);
+
+  // 가격 정보: 실시간 > 일봉 종가 > 없음
+  const priceInfo = useMemo(() => {
+    // 표시할 가격 데이터 결정
+    const priceData = realtimePrice
+      ? {
+          price: realtimePrice.price,
+          change: realtimePrice.change,
+          changeRate: realtimePrice.changeRate,
+          changeSign: realtimePrice.changeSign,
+        }
+      : lastDailyPrice;
+
+    // 데이터 없음
+    if (!priceData) {
+      return { price: "-", change: "-", changeRate: "-", changeSign: "flat" as const, isClosingPrice: false };
+    }
+
+    // 폐장 시: 실시간이든 일봉이든 [종가]로 표시
+    const isClosingPrice = !marketOpen;
+
+    return {
+      price: priceData.price.toLocaleString(),
+      change: priceData.change > 0 ? `+${priceData.change.toLocaleString()}` : priceData.change.toLocaleString(),
+      changeRate: priceData.changeRate > 0 ? `+${priceData.changeRate.toFixed(2)}%` : `${priceData.changeRate.toFixed(2)}%`,
+      changeSign: priceData.changeSign,
+      isClosingPrice,
+    };
+  }, [realtimePrice, marketOpen, lastDailyPrice]);
 
   // 등락 색상
   const changeColorClass = useMemo(() => {
@@ -84,6 +122,7 @@ export function StockDetailPanel({ stock, realtimePrice, signal, isSearchedStock
               <span className="text-2xl font-bold text-light-gray-90">{priceInfo.price}</span>
               <span className={`text-lg font-semibold ${changeColorClass}`}>{priceInfo.changeRate}</span>
               {realtimePrice && <span className="w-2 h-2 rounded-full bg-light-success-50 animate-pulse" />}
+              {priceInfo.isClosingPrice && <span className="text-xs text-light-gray-50 bg-light-gray-10 px-1.5 py-0.5 rounded">[종가]</span>}
             </div>
             <div className={`text-sm ${changeColorClass}`}>{priceInfo.change}</div>
           </>

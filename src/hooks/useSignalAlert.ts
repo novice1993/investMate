@@ -132,30 +132,36 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadDone = useRef(false);
 
+  // 알림 목록 로드 함수 (초기 로드 + 스크리닝 완료 시 refetch)
+  const loadAlerts = useCallback(async () => {
+    try {
+      const response = await jsonHttpClient.get<FetchAlertsResponse>("/api/signal-alerts");
+
+      if (response.success && response.data) {
+        const alerts = response.data.alerts.map(mapAPIAlertToSignalAlert);
+        setRecentAlerts(alerts);
+        setUnreadCount(response.data.unreadCount);
+        return alerts.length;
+      }
+    } catch (error) {
+      console.error("[SignalAlert] 알림 로드 실패:", error);
+    }
+    return 0;
+  }, []);
+
   // DB에서 초기 알림 목록 로드
   useEffect(() => {
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
 
     async function loadInitialAlerts() {
-      try {
-        const response = await jsonHttpClient.get<FetchAlertsResponse>("/api/signal-alerts");
-
-        if (response.success && response.data) {
-          const alerts = response.data.alerts.map(mapAPIAlertToSignalAlert);
-          setRecentAlerts(alerts);
-          setUnreadCount(response.data.unreadCount);
-          console.log("[SignalAlert] DB에서 초기 알림 로드:", alerts.length, "개");
-        }
-      } catch (error) {
-        console.error("[SignalAlert] 초기 알림 로드 실패:", error);
-      } finally {
-        setIsLoading(false);
-      }
+      const count = await loadAlerts();
+      console.log("[SignalAlert] DB에서 초기 알림 로드:", count, "개");
+      setIsLoading(false);
     }
 
     loadInitialAlerts();
-  }, []);
+  }, [loadAlerts]);
 
   // Socket.io 이벤트 핸들링
   useEffect(() => {
@@ -223,18 +229,27 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       }
     };
 
+    // 스크리닝 완료 시 알림 목록 refetch (선별 종목 변경 반영)
+    const handleScreeningCompleted = async () => {
+      console.log("[SignalAlert] 스크리닝 완료 - 알림 목록 refetch");
+      setSignals(new Map()); // 시그널 상태 초기화
+      await loadAlerts();
+    };
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("signal-state-init", handleSignalStateInit);
     socket.on("signal-alert", handleSignalAlert);
+    socket.on("screening-completed", handleScreeningCompleted);
 
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("signal-state-init", handleSignalStateInit);
       socket.off("signal-alert", handleSignalAlert);
+      socket.off("screening-completed", handleScreeningCompleted);
     };
-  }, [socket, onNewAlert, stockNameMap]);
+  }, [socket, onNewAlert, stockNameMap, loadAlerts]);
 
   // 시그널 카운트 계산
   const rsiCount = Array.from(signals.values()).filter((s) => s.rsiOversold).length;
