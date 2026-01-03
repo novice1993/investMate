@@ -280,7 +280,11 @@ app.prepare().then(async () => {
       completedAt: payload.completedAt,
     });
 
-    console.log("[Server] ✅ 클라이언트에 screening-completed 이벤트 전송 완료");
+    // 4. 새로운 시그널 상태 전송 (클라이언트 동기화)
+    const updatedSignals = Object.fromEntries(signalState);
+    io.emit("signal-state-init", updatedSignals);
+
+    console.log("[Server] ✅ 클라이언트에 screening-completed + signal-state-init 전송 완료");
   });
 
   // KIS WebSocket 데이터 수신 → 시그널 체크 + Socket.io 브로드캐스트
