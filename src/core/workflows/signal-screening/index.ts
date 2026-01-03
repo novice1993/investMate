@@ -14,8 +14,20 @@ import { readKospiCorpMappingJson } from "@/core/infrastructure/financial/dart-s
 import { getLatestFinancialMetrics } from "@/core/infrastructure/financial/financial-metrics-repository.infra";
 import { replaceScreenedStocks } from "@/core/infrastructure/market/screened-stocks-repository.infra";
 import { getAllValuationMap } from "@/core/infrastructure/market/stock-valuation-repository.infra";
-import { getLatestConfirmedQuarter } from "@/core/services/financial-date.util";
+import { getLatestConfirmedQuarter, getPreviousQuarter } from "@/core/services/financial-date.util";
 import { SCREENING_CONFIG, screenStocks } from "@/core/services/stock-signal-screening.service";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** 재무 데이터 Fallback 임계값 (이 수 미만이면 이전 분기 조회) */
+const FINANCIAL_METRICS_MIN_THRESHOLD = 500;
+
+// ============================================================================
+// Types
+// ============================================================================
+
 import type { SignalScreeningWorkflowResult } from "./types";
 
 // ============================================================================
@@ -37,10 +49,28 @@ export async function runSignalScreeningWorkflow(): Promise<SignalScreeningWorkf
     const corpMappings = await readKospiCorpMappingJson();
     console.log(`[Stock Screening Workflow] Loaded ${corpMappings.length} companies`);
 
-    // 2. 최신 재무 지표 조회 (Supabase)
+    // 2. 최신 재무 지표 조회 (Supabase) + Fallback
     const { year, quarter } = getLatestConfirmedQuarter();
-    const financialMetrics = await getLatestFinancialMetrics(year.toString(), quarter);
+    let financialMetrics = await getLatestFinancialMetrics(year.toString(), quarter);
     console.log(`[Stock Screening Workflow] Fetched ${financialMetrics.length} financial metrics (${year} Q${quarter})`);
+
+    // Fallback: 데이터가 임계값 미만이면 이전 분기 데이터와 병합
+    if (financialMetrics.length < FINANCIAL_METRICS_MIN_THRESHOLD) {
+      console.log(`[Stock Screening Workflow] Data insufficient (${financialMetrics.length} < ${FINANCIAL_METRICS_MIN_THRESHOLD}), merging with previous quarter`);
+
+      // 최신 분기에 있는 종목은 유지
+      const existingStockCodes = new Set(financialMetrics.map((m) => m.stockCode));
+
+      // 이전 분기 데이터 조회
+      const prev = getPreviousQuarter(year, quarter);
+      const fallbackMetrics = await getLatestFinancialMetrics(prev.year.toString(), prev.quarter);
+      console.log(`[Stock Screening Workflow] Fallback fetched ${fallbackMetrics.length} financial metrics (${prev.year} Q${prev.quarter})`);
+
+      // 이전 분기 중 최신 분기에 없는 종목만 추가 (병합)
+      const additionalMetrics = fallbackMetrics.filter((m) => !existingStockCodes.has(m.stockCode));
+      financialMetrics = [...financialMetrics, ...additionalMetrics];
+      console.log(`[Stock Screening Workflow] Merged total: ${financialMetrics.length} (${existingStockCodes.size} from Q${quarter} + ${additionalMetrics.length} from Q${prev.quarter})`);
+    }
 
     if (financialMetrics.length === 0) {
       return createErrorResult("No financial metrics found", startTime);
