@@ -59,8 +59,8 @@ export const SCREENING_CONFIG: ScreeningConfig = {
     minROE: 5,
     maxDebtRatio: 200,
     minOperatingMargin: 3,
-    maxPER: 30,
-    maxPBR: 3.0,
+    maxPER: null, // 필터 비활성화 (대형주 포함)
+    maxPBR: null, // 필터 비활성화 (대형주 포함)
   },
   topN: 40,
 };
