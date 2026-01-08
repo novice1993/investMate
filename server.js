@@ -436,5 +436,31 @@ app.prepare().then(async () => {
     startMockSignalEmitter(io, {
       interval: 8000, // 8초마다 발생
     });
+
+    // =========================================================================
+    // KIS WebSocket 자동 재연결 Health Check
+    // - 평일 08:00~09:00 사이에 KIS가 미연결 상태면 재연결 시도
+    // - 10분마다 체크하여 개장 시간 전 연결 준비
+    // =========================================================================
+    setInterval(
+      async () => {
+        const now = new Date();
+        const hour = now.getHours();
+        const day = now.getDay(); // 0=일요일, 6=토요일
+
+        // 평일(1-5) + 08시~09시 사이 + KIS 미연결 → 재연결 시도
+        if (day >= 1 && day <= 5 && hour >= 8 && hour < 9 && !isKisConnected) {
+          console.log("[KIS Health Check] 개장 전 재연결 시도...");
+          try {
+            await initKisWebSocket();
+            isKisConnected = true;
+            console.log("[KIS Health Check] ✅ 재연결 성공");
+          } catch (error) {
+            console.error("[KIS Health Check] ❌ 재연결 실패:", error);
+          }
+        }
+      },
+      10 * 60 * 1000
+    ); // 10분마다 체크
   });
 });
