@@ -232,7 +232,7 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
     // 스크리닝 완료 시 알림 목록 refetch (선별 종목 변경 반영)
     const handleScreeningCompleted = async () => {
       console.log("[SignalAlert] 스크리닝 완료 - 알림 목록 refetch");
-      setSignals(new Map()); // 시그널 상태 초기화
+      // signal-state-init 이벤트에서 새 상태로 덮어쓰므로 여기서 초기화 불필요
       await loadAlerts();
     };
 
