@@ -56,9 +56,9 @@ export interface ScreenedStock {
 
 export const SCREENING_CONFIG: ScreeningConfig = {
   fundamental: {
-    minROE: 5,
-    maxDebtRatio: 200,
-    minOperatingMargin: 3,
+    minROE: -100, // 필터 사실상 비활성화 (대형주 포함)
+    maxDebtRatio: 10000, // 필터 사실상 비활성화 (대형주 포함)
+    minOperatingMargin: -100, // 필터 사실상 비활성화 (대형주 포함)
     maxPER: null, // 필터 비활성화 (대형주 포함)
     maxPBR: null, // 필터 비활성화 (대형주 포함)
   },
