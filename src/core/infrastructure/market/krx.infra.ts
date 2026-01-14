@@ -70,27 +70,56 @@ async function fetchAndCacheKrxRawData(market: "KOSPI" | "KOSDAQ"): Promise<RawK
   console.log(`[KRX] Fetching raw data from KRX API for ${market}`);
   try {
     const marketId = market === "KOSPI" ? "STK" : "KSQ";
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    console.log(`[KRX] Requesting data for date: ${today}, marketId: ${marketId}`);
+
     const otp = await generateOtp(marketId);
-    const downloadResponse = await fetch(`${DOWNLOAD_URL}?code=${otp}`);
+    console.log(`[KRX] OTP generated: ${otp.substring(0, 20)}...`);
+
+    const downloadResponse = await fetch(`${DOWNLOAD_URL}?code=${otp}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Referer: "http://data.krx.co.kr/",
+      },
+    });
 
     if (!downloadResponse.ok) {
       throw new HttpError(downloadResponse, { message: `Failed to download CSV: ${downloadResponse.statusText}` });
     }
 
     const buffer = await downloadResponse.arrayBuffer();
+    console.log(`[KRX] Downloaded ${buffer.byteLength} bytes`);
+
     const decodedCsv = iconv.decode(Buffer.from(buffer), "euc-kr");
+    console.log(`[KRX] Decoded CSV length: ${decodedCsv.length} characters`);
 
     const parsed: Papa.ParseResult<RawKrxRow> = Papa.parse<RawKrxRow>(decodedCsv, {
       header: true,
       skipEmptyLines: true,
     });
 
+    console.log(`[KRX] Parsed ${parsed.data.length} rows, errors: ${parsed.errors.length}`);
+
+    if (parsed.errors.length > 0) {
+      console.warn(`[KRX] Parse errors:`, parsed.errors.slice(0, 5));
+    }
+
+    if (parsed.data.length === 0) {
+      console.error(`[KRX] ⚠️ WARNING: Parsed 0 rows from KRX API. CSV preview:`, decodedCsv.substring(0, 500));
+    }
+
     // 3. 원본 데이터 캐싱
     setCache(cacheKey, parsed.data);
     console.log(`[KRX] Successfully fetched and cached ${parsed.data.length} rows for ${market}`);
     return parsed.data;
   } catch (error) {
-    console.error(`[KRX] Failed to fetch raw data for ${market}:`, error);
+    console.error(`[KRX] ❌ Failed to fetch raw data for ${market}:`, error);
+    if (error instanceof Error) {
+      console.error(`[KRX] Error details:`, {
+        message: error.message,
+        stack: error.stack?.split("\n").slice(0, 3).join("\n"),
+      });
+    }
     return [];
   }
 }
@@ -103,6 +132,8 @@ async function generateOtp(marketId: string): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Referer: "http://data.krx.co.kr/",
     },
     body: new URLSearchParams({
       mktId: marketId,
