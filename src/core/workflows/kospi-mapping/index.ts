@@ -32,6 +32,16 @@ export async function syncKospiCorpMapping(): Promise<KospiMappingSyncResult> {
     const krxSecurities = await getMarketSecurities("KOSPI");
     console.log(`[KOSPI Mapping Sync] Fetched ${krxSecurities.length} KOSPI stocks from KRX`);
 
+    // KRX API 실패 시 기존 파일 보존 (덮어쓰기 방지)
+    if (krxSecurities.length === 0) {
+      console.warn("[KOSPI Mapping Sync] ⚠️ KRX returned 0 stocks - skipping file update to preserve existing data");
+      return {
+        success: false,
+        count: 0,
+        message: "KRX API returned 0 stocks - preserved existing mapping file",
+      };
+    }
+
     // 2. 종목코드 Set 및 시가총액 Map 생성 (~0.1MB)
     const stockCodeSet = new Set<string>();
     const marketCapMap = new Map<string, number>();
