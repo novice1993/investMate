@@ -363,22 +363,22 @@ app.prepare().then(async () => {
     // 클라이언트 구독 목록 초기화
     clientSubscriptions.set(socket.id, new Set());
 
-    // 클라이언트 준비 완료 시 초기 상태 전송 (Race Condition 방지)
-    socket.on("client-ready", () => {
-      if (dev) console.log("[Socket.io] 클라이언트 준비 완료 - 초기 상태 전송");
+    // 연결 즉시 초기 상태 전송 (타이밍이 맞는 경우를 위해)
+    socket.emit("kis-status", { connected: isKisConnected });
+    const currentSignals = Object.fromEntries(signalState);
+    socket.emit("signal-state-init", currentSignals);
 
-      // KIS 연결 상태 전송
+    // 클라이언트의 KIS 상태 요청 처리 (놓친 경우 대비)
+    socket.on("request-kis-status", () => {
+      if (dev) console.log("[Socket.io] KIS 상태 재요청 수신");
       socket.emit("kis-status", { connected: isKisConnected });
-
-      // 현재 시그널 상태 일괄 전송
-      const currentSignals = Object.fromEntries(signalState);
-      socket.emit("signal-state-init", currentSignals);
     });
 
-    // 클라이언트의 KIS 상태 요청 처리 (개별 요청)
-    socket.on("request-kis-status", () => {
-      if (dev) console.log("[Socket.io] KIS 상태 요청 수신");
-      socket.emit("kis-status", { connected: isKisConnected });
+    // 클라이언트의 시그널 상태 요청 처리 (놓친 경우 대비)
+    socket.on("request-signal-state", () => {
+      if (dev) console.log("[Socket.io] 시그널 상태 재요청 수신");
+      const currentSignals = Object.fromEntries(signalState);
+      socket.emit("signal-state-init", currentSignals);
     });
 
     // 프론트엔드 구독 요청 → KIS에 구독 전달
