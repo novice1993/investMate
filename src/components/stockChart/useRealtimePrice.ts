@@ -40,6 +40,8 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
     const handleConnect = () => {
       console.log("[RealtimePrice] 서버 연결 성공");
       setIsConnected(true);
+      // 연결 직후 KIS 상태 요청
+      socket.emit("request-kis-status");
     };
 
     const handleDisconnect = () => {
@@ -70,6 +72,13 @@ export function useRealtimePrice(): UseRealtimePriceReturn {
     socket.on("disconnect", handleDisconnect);
     socket.on("kis-status", handleKisStatus);
     socket.on("price-update", handlePriceUpdate);
+
+    // 이벤트 리스너 등록 후, 이미 연결되어 있다면 KIS 상태 요청
+    // (Race Condition 방지: 리스너 등록 전에 발생한 kis-status 이벤트 대응)
+    if (socket.connected) {
+      console.log("[RealtimePrice] 이미 연결됨 - KIS 상태 요청");
+      socket.emit("request-kis-status");
+    }
 
     return () => {
       socket.off("connect", handleConnect);

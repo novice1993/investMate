@@ -370,6 +370,12 @@ app.prepare().then(async () => {
     const currentSignals = Object.fromEntries(signalState);
     socket.emit("signal-state-init", currentSignals);
 
+    // 클라이언트의 KIS 상태 요청 처리 (Race Condition 방지)
+    socket.on("request-kis-status", () => {
+      if (dev) console.log("[Socket.io] KIS 상태 요청 수신");
+      socket.emit("kis-status", { connected: isKisConnected });
+    });
+
     // 프론트엔드 구독 요청 → KIS에 구독 전달
     socket.on("subscribe", ({ stockCode }) => {
       if (dev) console.log(`[Socket.io] ${stockCode} 구독 요청`);
