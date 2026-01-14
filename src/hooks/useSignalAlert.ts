@@ -178,7 +178,7 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       setIsConnected(false);
     };
 
-    // 초기 시그널 상태 수신 (접속 시 서버에서 일괄 전송)
+    // 초기 시그널 상태 수신 (서버에서 client-ready 응답으로 전송)
     const handleSignalStateInit = (initialState: Record<string, SignalTriggers>) => {
       console.log("[SignalAlert] 초기 상태 수신:", Object.keys(initialState).length, "개 종목");
 
@@ -236,11 +236,17 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       await loadAlerts();
     };
 
+    // 이벤트 리스너 등록
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("signal-state-init", handleSignalStateInit);
     socket.on("signal-alert", handleSignalAlert);
     socket.on("screening-completed", handleScreeningCompleted);
+
+    // 이벤트 리스너 등록 후, 서버에 초기 상태 요청
+    // (Race Condition 방지: 클라이언트 준비 완료 신호)
+    console.log("[SignalAlert] 이벤트 리스너 등록 완료 - 서버에 준비 신호 전송");
+    socket.emit("client-ready");
 
     return () => {
       socket.off("connect", handleConnect);
