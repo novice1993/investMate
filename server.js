@@ -363,14 +363,19 @@ app.prepare().then(async () => {
     // 클라이언트 구독 목록 초기화
     clientSubscriptions.set(socket.id, new Set());
 
-    // KIS 연결 상태를 클라이언트에 전달
-    socket.emit("kis-status", { connected: isKisConnected });
+    // 클라이언트 준비 완료 시 초기 상태 전송 (Race Condition 방지)
+    socket.on("client-ready", () => {
+      if (dev) console.log("[Socket.io] 클라이언트 준비 완료 - 초기 상태 전송");
 
-    // 현재 시그널 상태 일괄 전송 (클라이언트 초기화용)
-    const currentSignals = Object.fromEntries(signalState);
-    socket.emit("signal-state-init", currentSignals);
+      // KIS 연결 상태 전송
+      socket.emit("kis-status", { connected: isKisConnected });
 
-    // 클라이언트의 KIS 상태 요청 처리 (Race Condition 방지)
+      // 현재 시그널 상태 일괄 전송
+      const currentSignals = Object.fromEntries(signalState);
+      socket.emit("signal-state-init", currentSignals);
+    });
+
+    // 클라이언트의 KIS 상태 요청 처리 (개별 요청)
     socket.on("request-kis-status", () => {
       if (dev) console.log("[Socket.io] KIS 상태 요청 수신");
       socket.emit("kis-status", { connected: isKisConnected });
