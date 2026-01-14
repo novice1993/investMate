@@ -243,10 +243,9 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
     socket.on("signal-alert", handleSignalAlert);
     socket.on("screening-completed", handleScreeningCompleted);
 
-    // 이벤트 리스너 등록 후, 서버에 초기 상태 요청
-    // (Race Condition 방지: 클라이언트 준비 완료 신호)
-    console.log("[SignalAlert] 이벤트 리스너 등록 완료 - 서버에 준비 신호 전송");
-    socket.emit("client-ready");
+    // 이벤트 리스너 등록 후, 시그널 상태 요청 (Race Condition 방지)
+    console.log("[SignalAlert] 이벤트 리스너 등록 완료 - 시그널 상태 요청");
+    socket.emit("request-signal-state");
 
     return () => {
       socket.off("connect", handleConnect);
@@ -255,7 +254,8 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       socket.off("signal-alert", handleSignalAlert);
       socket.off("screening-completed", handleScreeningCompleted);
     };
-  }, [socket, onNewAlert, stockNameMap, loadAlerts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]); // onNewAlert, stockNameMap, loadAlerts는 핸들러 내부에서 최신 값 참조
 
   // 시그널 카운트 계산
   const rsiCount = Array.from(signals.values()).filter((s) => s.rsiOversold).length;
