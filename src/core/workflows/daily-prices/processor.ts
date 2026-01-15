@@ -13,6 +13,18 @@ import { getPeriodStockPrice, toStockPriceEntities } from "@/core/infrastructure
 const API_DELAY_MS = 1000;
 
 /**
+ * 배치 처리 단위 (종목 수)
+ * 100개씩 처리 후 메모리 정리 시간 확보
+ */
+const BATCH_SIZE = 100;
+
+/**
+ * 배치 간 대기 시간 (ms)
+ * 메모리 해제 및 서버 안정성 확보
+ */
+const BATCH_DELAY_MS = 10000; // 10초
+
+/**
  * 배치 처리 결과
  */
 export interface ProcessResult {
@@ -33,10 +45,14 @@ export async function processDailyPrices(stockCodes: string[]): Promise<ProcessR
   let totalSaved = 0;
 
   const total = stockCodes.length;
+  const totalBatches = Math.ceil(total / BATCH_SIZE);
+
+  console.log(`[Daily Prices Processor] 배치 처리 시작: ${total}개 종목을 ${totalBatches}개 배치로 분할`);
 
   for (let i = 0; i < stockCodes.length; i++) {
     const stockCode = stockCodes[i];
     const progress = `[${i + 1}/${total}]`;
+    const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
 
     try {
       // 1. KIS API로 100일치 일봉 조회
@@ -64,11 +80,20 @@ export async function processDailyPrices(stockCodes: string[]): Promise<ProcessR
       failed.push(stockCode);
     }
 
-    // Rate Limit: 마지막이 아니면 대기
+    // Rate Limit: 종목 간 대기
     if (i < stockCodes.length - 1) {
       await sleep(API_DELAY_MS);
     }
+
+    // 배치 완료 시 메모리 정리 대기
+    if ((i + 1) % BATCH_SIZE === 0 && i < stockCodes.length - 1) {
+      console.log(`[Daily Prices Processor] 배치 ${currentBatch}/${totalBatches} 완료 (${i + 1}/${total}). ${BATCH_DELAY_MS / 1000}초 대기 중...`);
+      await sleep(BATCH_DELAY_MS);
+      console.log(`[Daily Prices Processor] 배치 ${currentBatch + 1}/${totalBatches} 시작`);
+    }
   }
+
+  console.log(`[Daily Prices Processor] 전체 배치 처리 완료: 성공 ${totalProcessed}개, 실패 ${failed.length}개`);
 
   return {
     totalProcessed,

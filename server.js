@@ -254,37 +254,36 @@ app.prepare().then(async () => {
   appEvents.on(APP_EVENTS.SCREENING_COMPLETED, async (payload) => {
     console.log("[Server] 스크리닝 완료 이벤트 수신:", payload.screenedCount, "개 종목");
 
-    // 1. KIS WebSocket 구독 갱신
-    updateKisSubscriptions(payload.stockCodes);
-
-    // 2. 메모리 캐시 동기화 (새 선별 종목 기준으로 갱신)
+    // 전체 동기화 (원자적 처리 - 실패 시 모든 상태 유지)
     try {
-      // 2-1. 가격 캐시 갱신
+      // 1. 가격 캐시 갱신
       await refreshPriceCache();
 
-      // 2-2. 시그널 상태 갱신
+      // 2. 시그널 상태 갱신
       signalState.clear();
       initializeSignalState();
 
-      // 2-3. Mock 시그널용 캐시 갱신
+      // 3. Mock 시그널용 캐시 갱신
       await refreshCachedStockCodes();
 
-      console.log("[Server] ✅ 메모리 캐시 동기화 완료");
+      // 4. KIS WebSocket 구독 갱신 (메모리 업데이트 성공 후)
+      updateKisSubscriptions(payload.stockCodes);
+
+      // 5. 클라이언트에 스크리닝 완료 알림 (종목 목록 refetch 트리거)
+      io.emit("screening-completed", {
+        screenedCount: payload.screenedCount,
+        completedAt: payload.completedAt,
+      });
+
+      // 6. 새로운 시그널 상태 전송 (클라이언트 동기화)
+      const updatedSignals = Object.fromEntries(signalState);
+      io.emit("signal-state-init", updatedSignals);
+
+      console.log("[Server] ✅ 전체 동기화 및 클라이언트 알림 완료");
     } catch (error) {
-      console.error("[Server] ❌ 메모리 캐시 동기화 실패:", error);
+      console.error("[Server] ❌ 스크리닝 동기화 실패:", error);
+      console.error("[Server] ⚠️  모든 상태 유지 (일관성 보장). 다음 Health Check(08:00)에 재시도됩니다.");
     }
-
-    // 3. 클라이언트에 스크리닝 완료 알림 (종목 목록 refetch 트리거)
-    io.emit("screening-completed", {
-      screenedCount: payload.screenedCount,
-      completedAt: payload.completedAt,
-    });
-
-    // 4. 새로운 시그널 상태 전송 (클라이언트 동기화)
-    const updatedSignals = Object.fromEntries(signalState);
-    io.emit("signal-state-init", updatedSignals);
-
-    console.log("[Server] ✅ 클라이언트에 screening-completed + signal-state-init 전송 완료");
   });
 
   // KIS WebSocket 데이터 수신 → 시그널 체크 + Socket.io 브로드캐스트
@@ -449,9 +448,10 @@ app.prepare().then(async () => {
     });
 
     // =========================================================================
-    // KIS WebSocket 자동 재연결 Health Check
-    // - 평일 08:00~09:00 사이에 KIS가 미연결 상태면 재연결 시도
-    // - 10분마다 체크하여 개장 시간 전 연결 준비
+    // KIS WebSocket Health Check (개장 전 동기화)
+    // - 평일 08:00~09:00 사이에 DB 기준으로 재동기화
+    // - 10분마다 체크하여 개장 시간 전 연결 + 최신 종목 구독 보장
+    // - 전날 스크리닝 실패 시에도 이 시점에 복구됨
     // =========================================================================
     setInterval(
       async () => {
@@ -459,15 +459,22 @@ app.prepare().then(async () => {
         const hour = now.getHours();
         const day = now.getDay(); // 0=일요일, 6=토요일
 
-        // 평일(1-5) + 08시~09시 사이 + KIS 미연결 → 재연결 시도
-        if (day >= 1 && day <= 5 && hour >= 8 && hour < 9 && !isKisConnected) {
-          console.log("[KIS Health Check] 개장 전 재연결 시도...");
+        // 평일(1-5) + 08시~09시 사이 → DB 기준 재동기화
+        if (day >= 1 && day <= 5 && hour >= 8 && hour < 9) {
+          console.log("[KIS Health Check] 개장 전 동기화 시작...");
           try {
+            // 기존 연결 종료 (재구독을 위해)
+            if (isKisConnected) {
+              console.log("[KIS Health Check] 기존 연결 해제 후 재연결");
+            }
+
+            // DB에서 최신 선별 종목 기준으로 재연결 + 구독
             await initKisWebSocket();
             isKisConnected = true;
-            console.log("[KIS Health Check] ✅ 재연결 성공");
+            console.log("[KIS Health Check] ✅ DB 기준 재동기화 완료");
           } catch (error) {
-            console.error("[KIS Health Check] ❌ 재연결 실패:", error);
+            console.error("[KIS Health Check] ❌ 동기화 실패:", error);
+            isKisConnected = false;
           }
         }
       },
