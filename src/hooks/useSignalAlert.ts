@@ -132,6 +132,9 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadDone = useRef(false);
 
+  // stockNameMap을 ref로 관리 (이벤트 리스너 재등록 없이 최신 값 참조)
+  const stockNameMapRef = useRef(stockNameMap);
+
   // 알림 목록 로드 함수 (초기 로드 + 스크리닝 완료 시 refetch)
   const loadAlerts = useCallback(async () => {
     try {
@@ -162,6 +165,11 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
 
     loadInitialAlerts();
   }, [loadAlerts]);
+
+  // stockNameMap 변경 시 ref 업데이트 (스크리닝 완료 시 새 종목명 반영)
+  useEffect(() => {
+    stockNameMapRef.current = stockNameMap;
+  }, [stockNameMap]);
 
   // Socket.io 이벤트 핸들링
   useEffect(() => {
@@ -222,9 +230,9 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       // 읽지 않은 개수 증가
       setUnreadCount((prev) => prev + 1);
 
-      // 콜백 호출 (토스트 등)
+      // 콜백 호출 (토스트 등) - ref에서 최신 stockNameMap 참조
       if (onNewAlert) {
-        const corpName = stockNameMap?.get(alert.stockCode);
+        const corpName = stockNameMapRef.current?.get(alert.stockCode);
         onNewAlert(alert, corpName);
       }
     };
@@ -255,7 +263,7 @@ export function useSignalAlert(options: UseSignalAlertOptions = {}): UseSignalAl
       socket.off("screening-completed", handleScreeningCompleted);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket]); // onNewAlert, stockNameMap, loadAlerts는 핸들러 내부에서 최신 값 참조
+  }, [socket]); // stockNameMap은 ref로 관리, onNewAlert/loadAlerts는 핸들러 내부에서 최신 값 참조
 
   // 시그널 카운트 계산
   const rsiCount = Array.from(signals.values()).filter((s) => s.rsiOversold).length;
