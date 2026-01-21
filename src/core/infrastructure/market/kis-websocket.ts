@@ -58,16 +58,61 @@ export class KisWebSocketClient {
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
-  private reconnectDelay: number = 5000; // 5초
+  private baseReconnectDelay: number = 5000; // 5초
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private isReconnecting: boolean = false;
+
+  /**
+   * 현재 시간이 장 개장 시간인지 확인 (평일 09:00-15:30 KST)
+   */
+  private isMarketOpen(): boolean {
+    const now = new Date();
+    const koreaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const day = koreaTime.getDay();
+    const hour = koreaTime.getHours();
+    const minute = koreaTime.getMinutes();
+
+    if (day === 0 || day === 6) return false;
+
+    const currentMinutes = hour * 60 + minute;
+    return currentMinutes >= 9 * 60 && currentMinutes <= 15 * 60 + 30;
+  }
+
+  /**
+   * 기존 WebSocket 연결 정리
+   */
+  private cleanupConnection(): void {
+    if (this.ws) {
+      // 모든 이벤트 리스너 제거
+      this.ws.removeAllListeners();
+
+      // 연결 종료 (이미 닫혀있을 수 있음)
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
+
+      this.ws = null;
+    }
+
+    this.isConnected = false;
+  }
 
   /**
    * KIS WebSocket 서버에 연결
    */
   async connect(): Promise<void> {
+    // 기존 연결 정리
+    this.cleanupConnection();
+
+    // 재연결 타이머 취소
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     return new Promise((resolve, reject) => {
       try {
         // 1. Approval Key 가져오기
-        // Mock 모드에서는 가짜 키 사용, 실제 모드에서는 캐시에서 조회
         const isMockMode = process.env.MOCK_KIS_WS_ENABLED === "true";
         if (isMockMode) {
           this.approvalKey = "MOCK_APPROVAL_KEY";
@@ -89,6 +134,8 @@ export class KisWebSocketClient {
         this.ws.on("open", () => {
           console.log("[KIS WS] 연결 성공");
           this.isConnected = true;
+          this.reconnectAttempts = 0; // 성공 시 카운터 리셋
+          this.isReconnecting = false;
           resolve();
         });
 
@@ -96,21 +143,30 @@ export class KisWebSocketClient {
         this.ws.on("error", (error) => {
           console.error("[KIS WS] 에러:", error);
           this.isConnected = false;
-          reject(error);
+
+          // 아직 연결 중이었다면 reject
+          if (!this.isReconnecting) {
+            reject(error);
+          }
         });
 
         // 5. 연결 종료 → 자동 재연결 시도
-        this.ws.on("close", () => {
-          console.log("[KIS WS] 연결 종료");
+        this.ws.on("close", (code, reason) => {
+          console.log(`[KIS WS] 연결 종료 (code: ${code}, reason: ${reason?.toString() || "N/A"})`);
           this.isConnected = false;
-          this.attemptReconnect();
+
+          // 중복 재연결 방지
+          if (!this.isReconnecting) {
+            this.attemptReconnect();
+          }
         });
 
-        // 6. 메시지 수신 (KIS에서 실시간 데이터가 올 때마다 호출됨)
+        // 6. 메시지 수신
         this.ws.on("message", (data) => {
           this.handleMessage(data);
         });
       } catch (error) {
+        this.cleanupConnection();
         reject(error);
       }
     });
@@ -201,18 +257,26 @@ export class KisWebSocketClient {
   }
 
   /**
-   * 여러 종목 일괄 구독 요청
+   * 여러 종목 일괄 구독 요청 (Throttling 적용)
+   * - KIS 서버 rate limiting 방지를 위해 50ms 간격으로 전송
    */
-  subscribeMultiple(stockCodes: string[]): void {
+  async subscribeMultiple(stockCodes: string[]): Promise<void> {
     if (!this.isConnected || !this.ws) {
       console.error("[KIS WS] 연결되지 않았습니다.");
       return;
     }
 
-    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 시작`);
-    for (const stockCode of stockCodes) {
-      this.subscribe(stockCode);
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 시작 (50ms 간격)`);
+
+    for (let i = 0; i < stockCodes.length; i++) {
+      this.subscribe(stockCodes[i]);
+
+      // 마지막 종목이 아니면 50ms 대기
+      if (i < stockCodes.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     }
+
     console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 완료`);
   }
 
@@ -274,18 +338,26 @@ export class KisWebSocketClient {
   }
 
   /**
-   * 여러 종목 일괄 구독 해제
+   * 여러 종목 일괄 구독 해제 (Throttling 적용)
+   * - KIS 서버 rate limiting 방지를 위해 50ms 간격으로 전송
    */
-  unsubscribeMultiple(stockCodes: string[]): void {
+  async unsubscribeMultiple(stockCodes: string[]): Promise<void> {
     if (!this.isConnected || !this.ws) {
       console.error("[KIS WS] 연결되지 않았습니다.");
       return;
     }
 
-    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 해제 시작`);
-    for (const stockCode of stockCodes) {
-      this.unsubscribe(stockCode);
+    console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 해제 시작 (50ms 간격)`);
+
+    for (let i = 0; i < stockCodes.length; i++) {
+      this.unsubscribe(stockCodes[i]);
+
+      // 마지막 종목이 아니면 50ms 대기
+      if (i < stockCodes.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     }
+
     console.log(`[KIS WS] ${stockCodes.length}개 종목 일괄 구독 해제 완료`);
   }
 
@@ -299,25 +371,49 @@ export class KisWebSocketClient {
    * 자동 재연결 시도
    */
   private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(`[KIS WS] 최대 재연결 시도 횟수(${this.maxReconnectAttempts}회) 초과. 재연결 중단.`);
+    // 재연결 중복 방지
+    if (this.isReconnecting) {
+      return;
+    }
+
+    const isMarketTime = this.isMarketOpen();
+
+    // 장중이 아닌 경우: 최대 5회까지만 재시도
+    if (!isMarketTime && this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error(`[KIS WS] 장 마감 시간 - 최대 재연결 시도 횟수(${this.maxReconnectAttempts}회) 초과. 재연결 중단.`);
+      console.log("[KIS WS] 다음 장 개장 시간(평일 08:00-09:00)에 Health Check가 재연결을 시도합니다.");
+      this.isReconnecting = false;
       this.onConnectionStatusChanged?.(false);
       return;
     }
 
+    this.isReconnecting = true;
     this.reconnectAttempts++;
-    console.log(`[KIS WS] ${this.reconnectDelay / 1000}초 후 재연결 시도 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
-    setTimeout(async () => {
+    // Exponential backoff: 5초 → 10초 → 20초 → 40초 → 최대 60초
+    const delay = Math.min(this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 60000);
+
+    if (isMarketTime) {
+      console.log(`[KIS WS] 🔥 장중 - ${delay / 1000}초 후 재연결 시도 (${this.reconnectAttempts}회차, 무제한)`);
+    } else {
+      console.log(`[KIS WS] ${delay / 1000}초 후 재연결 시도 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    }
+
+    this.reconnectTimer = setTimeout(async () => {
       try {
         await this.connect();
-        console.log("[KIS WS] 재연결 성공");
-        this.reconnectAttempts = 0; // 성공 시 카운터 리셋
+        console.log("[KIS WS] ✅ 재연결 성공");
+        this.reconnectAttempts = 0;
+        this.isReconnecting = false;
         this.onConnectionStatusChanged?.(true);
       } catch (error) {
         console.error("[KIS WS] 재연결 실패:", error);
+        this.isReconnecting = false;
+
+        // 재귀적으로 다시 재연결 시도
+        this.attemptReconnect();
       }
-    }, this.reconnectDelay);
+    }, delay);
   }
 
   /**
@@ -329,12 +425,19 @@ export class KisWebSocketClient {
    * 연결 종료
    */
   disconnect(): void {
-    if (this.ws) {
-      console.log("[KIS WS] 연결 종료 요청");
-      this.reconnectAttempts = this.maxReconnectAttempts; // 수동 종료 시 재연결 방지
-      this.ws.close();
-      this.ws = null;
-      this.isConnected = false;
+    console.log("[KIS WS] 연결 종료 요청");
+
+    // 재연결 타이머 취소
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
+
+    // 재연결 방지
+    this.isReconnecting = false;
+    this.reconnectAttempts = this.maxReconnectAttempts;
+
+    // WebSocket 정리
+    this.cleanupConnection();
   }
 }

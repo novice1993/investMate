@@ -448,27 +448,30 @@ app.prepare().then(async () => {
     });
 
     // =========================================================================
-    // KIS WebSocket Health Check (개장 전 동기화)
-    // - 평일 08:00~09:00 사이에 DB 기준으로 재동기화
-    // - 10분마다 체크하여 개장 시간 전 연결 + 최신 종목 구독 보장
-    // - 전날 스크리닝 실패 시에도 이 시점에 복구됨
+    // KIS WebSocket Health Check
+    // - 평일 08:00~09:00: 개장 전 DB 기준 재동기화 (10분마다)
+    // - 평일 09:00~15:30: 장중 연결 모니터링 (5분마다, 끊어지면 재연결)
     // =========================================================================
     setInterval(
       async () => {
         const now = new Date();
-        const hour = now.getHours();
-        const day = now.getDay(); // 0=일요일, 6=토요일
+        const koreaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const hour = koreaTime.getHours();
+        const minute = koreaTime.getMinutes();
+        const day = koreaTime.getDay(); // 0=일요일, 6=토요일
 
-        // 평일(1-5) + 08시~09시 사이 → DB 기준 재동기화
-        if (day >= 1 && day <= 5 && hour >= 8 && hour < 9) {
+        // 주말 제외
+        if (day === 0 || day === 6) return;
+
+        const currentMinutes = hour * 60 + minute;
+        const preMarketStart = 8 * 60; // 08:00
+        const marketOpen = 9 * 60; // 09:00
+        const marketClose = 15 * 60 + 30; // 15:30
+
+        // 1) 개장 전 동기화 (08:00~09:00)
+        if (currentMinutes >= preMarketStart && currentMinutes < marketOpen) {
           console.log("[KIS Health Check] 개장 전 동기화 시작...");
           try {
-            // 기존 연결 종료 (재구독을 위해)
-            if (isKisConnected) {
-              console.log("[KIS Health Check] 기존 연결 해제 후 재연결");
-            }
-
-            // DB에서 최신 선별 종목 기준으로 재연결 + 구독
             await initKisWebSocket();
             isKisConnected = true;
             console.log("[KIS Health Check] ✅ DB 기준 재동기화 완료");
@@ -477,8 +480,25 @@ app.prepare().then(async () => {
             isKisConnected = false;
           }
         }
+
+        // 2) 장중 연결 모니터링 (09:00~15:30)
+        if (currentMinutes >= marketOpen && currentMinutes <= marketClose) {
+          if (!isKisConnected) {
+            console.log("[KIS Health Check] 🔥 장중 연결 끊김 감지 - 즉시 재연결 시도");
+            try {
+              await initKisWebSocket();
+              isKisConnected = true;
+              console.log("[KIS Health Check] ✅ 장중 재연결 성공");
+            } catch (error) {
+              console.error("[KIS Health Check] ❌ 장중 재연결 실패:", error);
+              isKisConnected = false;
+            }
+          } else {
+            console.log("[KIS Health Check] 장중 연결 정상");
+          }
+        }
       },
-      10 * 60 * 1000
-    ); // 10분마다 체크
+      5 * 60 * 1000
+    ); // 5분마다 체크
   });
 });

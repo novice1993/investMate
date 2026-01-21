@@ -62,7 +62,7 @@ export const SCREENING_CONFIG: ScreeningConfig = {
     maxPER: null, // 필터 비활성화 (대형주 포함)
     maxPBR: null, // 필터 비활성화 (대형주 포함)
   },
-  topN: 40,
+  topN: 30, // KIS WebSocket rate limiting 방지 (이전: 40)
 };
 
 // ============================================================================
